@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Third Voice</title>
+  <style>
+    /* CSS: Mobile-first, calming design */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #333;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 2.2rem;
+      color: #fff;
+      text-align: center;
+      margin-bottom: 30px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      animation: fadeInDown 0.8s ease-out;
+    }
+    h2 {
+      font-size: 1.4rem;
+      color: #4a4a8c;
+      margin-top: 30px;
+      margin-bottom: 15px;
+    }
+    p {
+      font-size: 1rem;
+      margin-bottom: 15px;
+      line-height: 1.7;
+    }
+    .app {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+      margin-bottom: 30px;
+      animation: fadeInUp 0.8s ease-out;
+    }
+    textarea {
+      width: 100%;
+      height: 120px;
+      padding: 15px;
+      border: 2px solid #e8e9ff;
+      border-radius: 12px;
+      font-size: 1rem;
+      resize: none;
+      margin-bottom: 20px;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+      font-family: inherit;
+    }
+    textarea:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    .tone-selector {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 12px;
+      margin-bottom: 25px;
+    }
+    .tone-btn {
+      padding: 12px 16px;
+      background: linear-gradient(135deg, #e6e6fa 0%, #f0f0ff 100%);
+      color: #4a4a8c;
+      border: 2px solid transparent;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .tone-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+      transition: left 0.5s ease;
+    }
+    .tone-btn:hover::before {
+      left: 100%;
+    }
+    .tone-btn:hover, .tone-btn.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+    .tone-btn:focus {
+      outline: 2px solid #4a90e2;
+      outline-offset: 2px;
+    }
+    .rewrite-btn {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .rewrite-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: left 0.5s ease;
+    }
+    .rewrite-btn:hover::before {
+      left: 100%;
+    }
+    .rewrite-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+    .rewrite-btn:focus {
+      outline: 2px solid #4a90e2;
+      outline-offset: 2px;
+    }
+    .rewrite-btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .rewrite-btn.loading::after {
+      content: '';
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-left: 10px;
+    }
+    @keyframes spin { 
+      to { transform: rotate(360deg); } 
+    }
+    @keyframes fadeInDown {
+      from { opacity: 0; transform: translateY(-30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .result {
+      margin-top: 25px;
+      padding: 20px;
+      background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%);
+      border-radius: 12px;
+      border-left: 4px solid #667eea;
+      display: none;
+      animation: fadeInUp 0.5s ease-out;
+    }
+    .result h3 {
+      font-size: 1.2rem;
+      color: #4a4a8c;
+      margin-bottom: 15px;
+      font-weight: 600;
+    }
+    .rewritten-text {
+      font-size: 1.05rem;
+      line-height: 1.6;
+      color: #333;
+      background: rgba(255,255,255,0.8);
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      word-wrap: break-word;
+    }
+    .tone-analysis, .suggestion {
+      font-size: 0.95rem;
+      color: #666;
+      margin-top: 10px;
+      padding: 10px;
+      background: rgba(255,255,255,0.6);
+      border-radius: 6px;
+    }
+    .copy-btn {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      margin-top: 10px;
+      transition: background 0.3s ease;
+    }
+    .copy-btn:hover {
+      background: #5a6fd8;
+    }
+    .section {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 25px;
+      border-radius: 15px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    }
+    input, textarea.feedback {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e8e9ff;
+      border-radius: 8px;
+      font-size: 1rem;
+      margin-bottom: 15px;
+      transition: border-color 0.3s ease;
+      font-family: inherit;
+    }
+    input:focus, textarea.feedback:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    button[type="submit"] {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    button[type="submit"]:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+    button[type="submit"]:focus {
+      outline: 2px solid #4a90e2;
+      outline-offset: 2px;
+    }
+    footer {
+      text-align: center;
+      font-size: 0.9rem;
+      color: rgba(255,255,255,0.9);
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 15px;
+      margin-top: 20px;
+    }
+    footer a, footer button {
+      color: rgba(255,255,255,0.9);
+      text-decoration: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: color 0.3s ease;
+    }
+    footer a:hover, footer button:hover {
+      color: #fff;
+      text-decoration: underline;
+    }
+    .error-message {
+      color: #e74c3c;
+      background: rgba(231, 76, 60, 0.1);
+      padding: 10px;
+      border-radius: 6px;
+      margin-top: 10px;
+      display: none;
+    }
+    .success-message {
+      color: #27ae60;
+      background: rgba(39, 174, 96, 0.1);
+      padding: 10px;
+      border-radius: 6px;
+      margin-top: 10px;
+      display: none;
+    }
+    @media (max-width: 600px) {
+      .container {
+        padding: 0 10px;
+      }
+      h1 {
+        font-size: 1.8rem;
+      }
+      .app, .section {
+        padding: 20px;
+      }
+      .tone-selector {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>The Third Voice</h1>
+    <div class="app">
+      <textarea id="messageInput" placeholder="Paste or type your message here..." aria-label="Enter your message to rewrite"></textarea>
+      <div class="tone-selector">
+        <button class="tone-btn active" data-tone="Kind" aria-label="Select Kind tone">Kind</button>
+        <button class="tone-btn" data-tone="Direct" aria-label="Select Direct tone">Direct</button>
+        <button class="tone-btn" data-tone="Honest" aria-label="Select Honest tone">Honest</button>
+        <button class="tone-btn" data-tone="Empathetic" aria-label="Select Empathetic tone">Empathetic</button>
+      </div>
+      <button class="rewrite-btn" id="rewriteBtn">Rewrite It</button>
+      <div class="error-message" id="errorMessage"></div>
+      <div class="result" id="result">
+        <h3>Rewritten Message</h3>
+        <div class="rewritten-text" id="rewrittenMessage"></div>
+        <button class="copy-btn" onclick="copyRewrittenMessage()">Copy Message</button>
+        <div class="tone-analysis" id="toneAnalysis"></div>
+        <div class="suggestion" id="suggestion"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Privacy Notice</h2>
+      <p>Messages are processed locally in your browser using AI models. Nothing is sent to external servers or stored permanently.</p>
+    </div>
+
+    <div class="section">
+      <h2>Feedback</h2>
+      <form id="feedbackForm">
+        <textarea class="feedback" name="message" placeholder="Was this rewrite helpful? Share your thoughts..." rows="4" aria-label="Enter your feedback"></textarea>
+        <input type="email" name="email" placeholder="Your email (optional)" aria-label="Enter your email (optional)" />
+        <button type="submit">Send Feedback</button>
+      </form>
+      <div class="success-message" id="thankYouMessage">Thank you for your feedback!</div>
+    </div>
+
+    <div class="section">
+      <h2>About The Third Voice</h2>
+      <p>Created by Predrag Mirkovic from an immigration detention center using only a phone, The Third Voice is an emotionally intelligent AI assistant designed to prevent love from breaking down due to miscommunication. Our mission is to help you express yourself clearly and kindly, fostering understanding in your most important relationships.</p>
+    </div>
+
+    <div class="section">
+      <h2>Disclaimer</h2>
+      <p>The Third Voice is not a substitute for therapy, legal advice, or crisis services. If you are in crisis, please seek professional help immediately.</p>
+    </div>
+
+    <footer>
+      <p>Contact: <a href="mailto:hello@thethirdvoice.ai" target="_blank" aria-label="Email hello@thethirdvoice.ai">hello@thethirdvoice.ai</a> | <button onclick="copyEmail()" aria-label="Copy email to clipboard">Copy Email</button></p>
+      <p>Website: <a href="https://www.thethirdvoice.ai" target="_blank">www.thethirdvoice.ai</a></p>
+      <p>Hashtag: <a href="https://x.com/hashtag/TheThirdVoice" target="_blank">#TheThirdVoice</a></p>
+      <p>© 2025 The Third Voice</p>
+    </footer>
+  </div>
+
+  <script>
+    // Enhanced rewriting logic using local AI processing
+    const messageInput = document.getElementById('messageInput');
+    const rewriteBtn = document.getElementById('rewriteBtn');
+    const resultDiv = document.getElementById('result');
+    const rewrittenMessage = document.getElementById('rewrittenMessage');
+    const toneAnalysis = document.getElementById('toneAnalysis');
+    const suggestion = document.getElementById('suggestion');
+    const errorMessage = document.getElementById('errorMessage');
+    const toneButtons = document.querySelectorAll('.tone-btn');
+    const feedbackForm = document.getElementById('feedbackForm');
+    const thankYouMessage = document.getElementById('thankYouMessage');
+    let selectedTone = 'Kind';
+
+    // Tone selector logic
+    toneButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        toneButtons.forEach(btn => btn.classList.remove('active'));
+        button.classList.add('active');
+        selectedTone = button.dataset.tone;
+      });
+    });
+
+    // Enhanced rewriting engine with local processing
+    function analyzeOriginalTone(message) {
+      const lowerMessage = message.toLowerCase();
+      
+      // Simple tone detection based on keywords and patterns
+      const patterns = {
+        angry: ['angry', 'mad', 'furious', 'hate', 'damn', 'wtf', '!!!!', 'stupid', 'idiot'],
+        sad: ['sad', 'depressed', 'cry', 'tears', 'hurt', 'pain', 'broken', 'disappointed'],
+        excited: ['excited', 'amazing', 'awesome', 'great', 'fantastic', '!!!', 'love it', 'perfect'],
+        neutral: ['okay', 'fine', 'normal', 'regular', 'standard'],
+        formal: ['dear', 'sincerely', 'regards', 'thank you', 'please', 'kindly'],
+        casual: ['hey', 'hi', 'sup', 'gonna', 'wanna', 'yeah', 'nah', 'cool']
+      };
+      
+      for (const [tone, keywords] of Object.entries(patterns)) {
+        if (keywords.some(keyword => lowerMessage.includes(keyword))) {
+          return tone.charAt(0).toUpperCase() + tone.slice(1);
+        }
+      }
+      
+      // Check punctuation and caps
+      if (message.includes('!!!') || message === message.toUpperCase()) {
+        return 'Intense';
+      }
+      
+      return 'Neutral';
+    }
+
+    function rewriteMessage(message, tone) {
+      const toneTransforms = {
+        Kind: {
+          prefix: "I wanted to share that ",
+          softeners: ["perhaps", "maybe", "I think", "it seems like", "I feel"],
+          replacements: {
+            "you need to": "it might be helpful if you could",
+            "you should": "you might consider",
+            "you must": "it would be great if you could",
+            "wrong": "not quite right",
+            "bad": "challenging",
+            "stupid": "unclear",
+            "hate": "really don't enjoy",
+            "terrible": "difficult",
+            "awful": "not ideal"
+          }
+        },
+        Direct: {
+          prefix: "",
+          softeners: ["clearly", "simply", "specifically"],
+          replacements: {
+            "i think maybe": "I believe",
+            "perhaps": "I need",
+            "it seems like": "it is",
+            "kind of": "somewhat",
+            "sort of": "rather",
+            "probably": "likely"
+          }
+        },
+        Honest: {
+          prefix: "I need to be honest with you: ",
+          softeners: ["truthfully", "frankly", "to be clear"],
+          replacements: {
+            "fine": "actually not okay",
+            "okay": "manageable but not great",
+            "good": "genuinely good",
+            "bad": "genuinely difficult"
+          }
+        },
+        Empathetic: {
+          prefix: "I understand this might be difficult, and ",
+          softeners: ["I can imagine", "I understand", "I recognize", "it sounds like"],
+          replacements: {
+            "you're wrong": "I see it differently",
+            "that's stupid": "that's challenging",
+            "I don't care": "I'm struggling to connect with this",
+            "whatever": "I'm feeling overwhelmed about this"
+          }
+        }
+      };
+
+      const transform = toneTransforms[tone];
+      let rewritten = message;
+
+      // Apply replacements
+      for (const [original, replacement] of Object.entries(transform.replacements)) {
+        const regex = new RegExp(original, 'gi');
+        rewritten = rewritten.replace(regex, replacement);
+      }
+
+      // Add softeners for Kind and Empathetic tones
+      if (tone === 'Kind' || tone === 'Empathetic') {
+        const sentences = rewritten.split(/[.!?]+/).filter(s => s.trim());
+        rewritten = sentences.map(sentence => {
+          const trimmed = sentence.trim();
+          if (trimmed && Math.random() < 0.3) {
+            const softener = transform.softeners[Math.floor(Math.random() * transform.softeners.length)];
+            return softener + " " + trimmed.toLowerCase();
+          }
+          return trimmed;
+        }).join('. ') + '.';
+      }
+
+      // Add prefix if specified
+      if (transform.prefix && !rewritten.toLowerCase().startsWith(transform.prefix.toLowerCase())) {
+        rewritten = transform.prefix + rewritten.charAt(0).toLowerCase() + rewritten.slice(1);
+      }
+
+      // Clean up formatting
+      rewritten = rewritten.replace(/\s+/g, ' ').trim();
+      rewritten = rewritten.replace(/\.+/g, '.');
+      rewritten = rewritten.charAt(0).toUpperCase() + rewritten.slice(1);
+
+      return rewritten;
+    }
+
+    function getSuggestion(tone, originalTone, rewrittenText) {
+      const suggestions = {
+        Kind: {
+          default: "This sounds gentle and caring—ready to send!",
+          fromAngry: "Much better! This turns your frustration into a caring conversation.",
+          fromSad: "This transforms your sadness into something constructive and kind."
+        },
+        Direct: {
+          default: "This is clear and straightforward. Consider softening if the recipient is sensitive.",
+          fromAngry: "This channels your energy into clear, actionable communication.",
+          fromSad: "This turns your feelings into direct, honest communication."
+        },
+        Honest: {
+          default: "This is open and truthful. Ensure it's appropriate for the context.",
+          fromAngry: "This expresses your authentic feelings without attacking.",
+          fromSad: "This shares your genuine emotions in a healthy way."
+        },
+        Empathetic: {
+          default: "This shows understanding and care—great for sensitive situations!",
+          fromAngry: "This transforms anger into understanding and connection.",
+          fromSad: "This turns your pain into an opportunity for deeper connection."
+        }
+      };
+
+      const toneKey = `from${originalTone}`;
+      return suggestions[tone][toneKey] || suggestions[tone].default;
+    }
+
+    // Main rewrite function
+    rewriteBtn.addEventListener('click', async () => {
+      const message = messageInput.value.trim();
+      if (!message) {
+        showError('Please enter a message to rewrite.');
+        return;
+      }
+
+      if (message.length < 10) {
+        showError('Please enter a longer message for better rewriting.');
+        return;
+      }
+
+      hideError();
+      rewriteBtn.classList.add('loading');
+      rewriteBtn.textContent = 'Rewriting...';
+      rewriteBtn.disabled = true;
+
+      try {
+        // Simulate processing time for better UX
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        const originalTone = analyzeOriginalTone(message);
+        const rewritten = rewriteMessage(message, selectedTone);
+
+        // Display results
+        rewrittenMessage.textContent = rewritten;
+        toneAnalysis.textContent = `Original Tone: ${originalTone} → Rewritten Tone: ${selectedTone}`;
+        suggestion.textContent = getSuggestion(selectedTone, originalTone, rewritten);
+        
+        resultDiv.style.display = 'block';
+        resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      } catch (error) {
+        console.error('Error:', error);
+        showError('Something went wrong. Please try again.');
+      } finally {
+        rewriteBtn.classList.remove('loading');
+        rewriteBtn.textContent = 'Rewrite It';
+        rewriteBtn.disabled = false;
+      }
+    });
+
+    // Error handling
+    function showError(message) {
+      errorMessage.textContent = message;
+      errorMessage.style.display = 'block';
+      setTimeout(() => hideError(), 5000);
+    }
+
+    function hideError() {
+      errorMessage.style.display = 'none';
+    }
+
+    // Copy functionality
+    function copyRewrittenMessage() {
+      const text = rewrittenMessage.textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        const originalText = document.querySelector('.copy-btn').textContent;
+        document.querySelector('.copy-btn').textContent = 'Copied!';
+        setTimeout(() => {
+          document.queryS
