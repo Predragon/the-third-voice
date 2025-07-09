@@ -396,7 +396,7 @@
     });
 
     // Enhanced rewriting engine with local processing
-    function analyzeOriginalTone(message) {
+    function  {
       const lowerMessage = message.toLowerCase();
       
       // Simple tone detection based on keywords and patterns
@@ -423,7 +423,7 @@
       return 'Neutral';
     }
 
-    function rewriteMessage(message, tone) {
+    function {
       const toneTransforms = {
         Kind: {
           prefix: "I wanted to share that ",
@@ -509,7 +509,7 @@
       return rewritten;
     }
 
-    function getSuggestion(tone, originalTone, rewrittenText) {
+    function  {
       const suggestions = {
         Kind: {
           default: "This sounds gentle and caring—ready to send!",
@@ -571,7 +571,7 @@
 if (!response.ok) throw new Error("API Error");
 
 const data = await response.json();
-const rewritten = data.rewritten;
+const rewritten = data.result;
 
         // Display results
         rewrittenMessage.textContent = rewritten;
@@ -605,4 +605,5 @@ const rewritten = data.rewritten;
     // Copy functionality
     function copyRewrittenMessage() {
       const text = rewrittenMessage.textContent;
-      navi
+      navigator.clipboard.writeText(text).then(() => {
+        const originalText = document.querySelector('.copy-btn')
