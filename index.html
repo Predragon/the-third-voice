@@ -138,7 +138,8 @@
       left: 100%;
     }
     .rewrite-btn:hover {
-      transform: translateY(-2px);
+      trans
+: translateY(-2px);
       box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
     }
     .rewrite-btn:focus {
@@ -559,7 +560,18 @@
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         const originalTone = analyzeOriginalTone(message);
-        const rewritten = rewriteMessage(message, selectedTone);
+        const response = await fetch("/api/rewrite", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ message, tone: selectedTone }),
+});
+
+if (!response.ok) throw new Error("API Error");
+
+const data = await response.json();
+const rewritten = data.rewritten;
 
         // Display results
         rewrittenMessage.textContent = rewritten;
@@ -593,8 +605,4 @@
     // Copy functionality
     function copyRewrittenMessage() {
       const text = rewrittenMessage.textContent;
-      navigator.clipboard.writeText(text).then(() => {
-        const originalText = document.querySelector('.copy-btn').textContent;
-        document.querySelector('.copy-btn').textContent = 'Copied!';
-        setTimeout(() => {
-          document.queryS
+      navi
