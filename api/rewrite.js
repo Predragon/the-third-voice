@@ -6,6 +6,10 @@ export default async function handler(req, res) {
   const userInput = req.body?.message;
   const tone = req.body?.tone || "Kind";
 
+  if (!userInput) {
+    return res.status(400).json({ error: "Message content is required." });
+  }
+
   const prompt = `Rewrite the following message in a ${tone.toLowerCase()} tone:\n\n${userInput}`;
 
   try {
@@ -20,16 +24,19 @@ export default async function handler(req, res) {
 
     const result = await hfResponse.json();
 
-    // Check if result contains error
+    // Check if result contains error from Hugging Face
     if (result.error) {
-      return res.status(500).json({ error: result.error });
+      console.error("Hugging Face API returned error:", result.error);
+      // Send the specific Hugging Face error to the frontend
+      return res.status(500).json({ error: `Hugging Face API Error: ${result.error.toString()}` });
     }
 
     const output = result?.[0]?.generated_text || "No result from model";
-    res.status(200).json({ rewritten: output });
+    res.status(200).json({ result: output }); // Your frontend expects 'result'
 
   } catch (err) {
     console.error("API call failed:", err);
-    res.status(500).json({ error: "API call failed" });
+    // **CRITICAL TEMPORARY DEBUGGING LINE:** Send the detailed error message from 'err'
+    return res.status(500).json({ error: `API Call Failed (Backend): ${err.message || 'Unknown error'}` });
   }
 }
