@@ -29,7 +29,8 @@ export default async function handler(req, res) {
 
   // 4. API Call with Try-Catch for Error Handling
   try {
-    const hfResponse = await fetch("https://api-inference.huggingface.co/models/mrm8488/t5-base-finetuned-common_gen", { // <-- CORRECT MODEL HERE
+    // --- IMPORTANT CHANGE IS ON THIS LINE ---
+    const hfResponse = await fetch("https://api-inference.huggingface.co/models/google/flan-t5-small", { // <-- NEW MODEL HERE
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`, // Use the local apiKey variable
