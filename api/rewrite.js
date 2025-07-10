@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Only POST method is allowed." });
   }
 
-  const userInput = req.body?.message; // Use userInput for consistency
+  const userInput = req.body?.message;
   const tone = req.body?.tone || "Kind";
 
   if (!userInput) {
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
 
   // 4. API Call with Try-Catch for Error Handling
   try {
-    const hfResponse = await fetch("https://api-inference.huggingface.co/models/google/flan-t5-base", { // Using your chosen model
+    const hfResponse = await fetch("https://api-inference.huggingface.co/models/mrm8488/t5-base-finetuned-common_gen", { // <-- CORRECT MODEL HERE
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`, // Use the local apiKey variable
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
 
     const result = await hfResponse.json();
 
-    // Check if Hugging Face API returned its own error
+    // Check if Hugging Face API returned its own error (e.g., rate limit, invalid input)
     if (result.error) {
       console.error("Hugging Face API returned error:", result.error);
       return res.status(500).json({ error: `Hugging Face API Error: ${result.error.toString()}` });
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
     const output = result?.[0]?.generated_text || "No result from model";
 
     // 5. Send Response - Match Frontend Expectation (data.result)
-    res.status(200).json({ result: output }); // CHANGE: 'rewritten' to 'result'
+    res.status(200).json({ result: output }); // <-- Ensure this is 'result' for your frontend
 
   } catch (err) {
     // 6. Catch any network or other unexpected errors from fetch
