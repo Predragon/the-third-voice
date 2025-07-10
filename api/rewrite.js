@@ -6,14 +6,10 @@ export default async function handler(req, res) {
   const userInput = req.body?.message;
   const tone = req.body?.tone || "Kind";
 
-  if (!userInput || userInput.trim().length < 5) {
-    return res.status(400).json({ error: "Invalid message input" });
-  }
-
   const prompt = `Rewrite the following message in a ${tone.toLowerCase()} tone:\n\n${userInput}`;
 
   try {
-    const hfResponse = await fetch("https://api-inference.huggingface.co/models/google/flan-t5-base", {
+    const hfResponse = await fetch("https://api-inference.huggingface.co/models/mrm8488/t5-base-finetuned-common_gen", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.HF_API_KEY}`,
@@ -23,17 +19,17 @@ export default async function handler(req, res) {
     });
 
     const result = await hfResponse.json();
-    const output = result?.[0]?.generated_text;
 
-    if (!output) {
-      console.error("Hugging Face returned no output:", result);
-      return res.status(502).json({ error: "Model failed to generate text" });
+    // Check if result contains error
+    if (result.error) {
+      return res.status(500).json({ error: result.error });
     }
 
-    return res.status(200).json({ rewritten: output });
+    const output = result?.[0]?.generated_text || "No result from model";
+    res.status(200).json({ rewritten: output });
 
-  } catch (error) {
-    console.error("API error:", error);
-    return res.status(500).json({ error: "Internal server error" });
+  } catch (err) {
+    console.error("API call failed:", err);
+    res.status(500).json({ error: "API call failed" });
   }
 }
