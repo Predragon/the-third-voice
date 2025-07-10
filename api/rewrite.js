@@ -1,11 +1,12 @@
-// pages/api/rewrite.js
+// /api/rewrite.js
 
 export default async function handler(req, res) {
-  // 1. Input Validation
+  // 1. Only allow POST requests
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Only POST method is allowed." });
   }
 
+  // 2. Extract inputs
   const userInput = req.body?.message;
   const tone = req.body?.tone || "Kind";
 
@@ -13,48 +14,54 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Message content is required." });
   }
 
-  // 2. Define Prompt
+  // 3. Prepare the prompt
   const prompt = `Rewrite the following message in a ${tone}, emotionally intelligent tone:\n\n${userInput}`;
 
-  // 3. Temporary Debugging for API Key (Keep this for now!)
-  console.log("Attempting API call to Hugging Face.");
+  // 4. API key check
   const apiKey = process.env.HF_API_KEY;
   if (!apiKey) {
-    console.error("HF_API_KEY is UNDEFINED in environment!");
+    console.error("HF_API_KEY is undefined in environment variables.");
     return res.status(500).json({ error: "Server error: API Key not configured." });
-  } else {
-    console.log(`HF_API_KEY length: ${apiKey.length}`);
-    console.log(`HF_API_KEY starts with: ${apiKey.substring(0, 5)}...`); // Log first 5 chars
   }
 
-  // 4. API Call with Try-Catch for Error Handling
+  // 5. Make request to Hugging Face
   try {
-    // --- IMPORTANT CHANGE IS ON THIS LINE ---
-    const hfResponse = await fetch("https://api-inference.huggingface.co/models/google/flan-t5-small", { // <-- NEW MODEL HERE
+    const hfResponse = await fetch("https://api-inference.huggingface.co/models/google/flan-t5-small", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`, // Use the local apiKey variable
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ inputs: prompt }),
     });
 
-    const result = await hfResponse.json();
+    // Optional debug logging
+    const raw = await hfResponse.text();
+    console.log("Raw HF response:", raw);
 
-    // Check if Hugging Face API returned its own error (e.g., rate limit, invalid input)
+    // Parse JSON manually
+    let result;
+    try {
+      result = JSON.parse(raw);
+    } catch (jsonErr) {
+      console.error("JSON parse error:", jsonErr);
+      return res.status(500).json({ error: "Hugging Face returned invalid JSON." });
+    }
+
+    // Check for Hugging Face error in response
     if (result.error) {
       console.error("Hugging Face API returned error:", result.error);
       return res.status(500).json({ error: `Hugging Face API Error: ${result.error.toString()}` });
     }
 
+    // Get model output
     const output = result?.[0]?.generated_text || "No result from model";
 
-    // 5. Send Response - Match Frontend Expectation (data.result)
-    res.status(200).json({ result: output }); // <-- Ensure this is 'result' for your frontend
+    // 6. Return final result to frontend
+    return res.status(200).json({ result: output });
 
   } catch (err) {
-    // 6. Catch any network or other unexpected errors from fetch
-    console.error("API Call Failed (Backend unexpected error):", err);
-    return res.status(500).json({ error: `API Call Failed (Backend): ${err.message || 'Unknown error'}` });
+    console.error("API Call Failed:", err);
+    return res.status(500).json({ error: `API Call Failed (Backend): ${err.message || "Unknown error"}` });
   }
 }
