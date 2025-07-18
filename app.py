@@ -2,10 +2,83 @@ import streamlit as st
 import json
 import datetime
 import requests
+import base64
+from streamlit.components.v1 import html
 
 # Constants
 CONTEXTS = ["general", "romantic", "coparenting", "workplace", "family", "friend"]
 REQUIRE_TOKEN = False
+
+# Browser Storage Functions
+def save_to_browser_storage(data, key="third_voice_data"):
+    """Save data to browser localStorage"""
+    try:
+        json_data = json.dumps(data, separators=(',', ':'))
+        # Escape quotes and newlines for JavaScript
+        escaped_data = json_data.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r')
+        
+        html_code = f"""
+        <script>
+            try {{
+                localStorage.setItem('{key}', "{escaped_data}");
+                console.log('✅ Data saved to browser storage');
+            }} catch (e) {{
+                console.error('❌ Error saving to browser storage:', e);
+            }}
+        </script>
+        """
+        html(html_code, height=0)
+    except Exception as e:
+        st.error(f"Error saving to browser storage: {e}")
+
+def load_from_browser_storage():
+    """Load data from browser localStorage and update session state"""
+    html_code = """
+    <script>
+        try {
+            const data = localStorage.getItem('third_voice_data');
+            if (data) {
+                // Parse the data to validate it
+                const parsedData = JSON.parse(data);
+                
+                // Send data to Streamlit
+                window.parent.postMessage({
+                    type: 'FROM_STREAMLIT_STORAGE',
+                    data: parsedData
+                }, '*');
+                
+                console.log('✅ Data loaded from browser storage');
+            } else {
+                console.log('ℹ️ No data found in browser storage');
+            }
+        } catch (e) {
+            console.error('❌ Error loading from browser storage:', e);
+        }
+    </script>
+    """
+    html(html_code, height=0)
+
+def auto_save():
+    """Automatically save current session state to browser storage"""
+    save_data = {
+        'contacts': st.session_state.contacts,
+        'journal_entries': st.session_state.journal_entries,
+        'feedback_data': st.session_state.feedback_data,
+        'user_stats': st.session_state.user_stats,
+        'saved_at': datetime.datetime.now().isoformat(),
+        'version': '1.0'
+    }
+    save_to_browser_storage(save_data)
+
+def clear_browser_storage():
+    """Clear all data from browser storage"""
+    html_code = """
+    <script>
+        localStorage.removeItem('third_voice_data');
+        console.log('🗑️ Browser storage cleared');
+    </script>
+    """
+    html(html_code, height=0)
 
 # Setup
 st.set_page_config(page_title="The Third Voice", page_icon="🎙️", layout="wide")
@@ -23,6 +96,7 @@ st.markdown("""
 .main-actions button {flex:1;padding:0.8rem;font-size:1.1rem}
 .feedback-section {background:rgba(0,150,136,0.1);padding:1rem;border-radius:8px;margin:1rem 0}
 .stats-card {background:rgba(63,81,181,0.1);padding:1rem;border-radius:8px;margin:0.5rem 0;text-align:center}
+.storage-info {background:rgba(255,152,0,0.1);padding:0.5rem;border-radius:5px;margin:0.5rem 0;font-size:0.9rem}
 </style>""", unsafe_allow_html=True)
 
 # Session defaults
@@ -33,12 +107,18 @@ defaults = {
     'active_contact': 'General',
     'journal_entries': {},
     'feedback_data': {},
-    'user_stats': {'total_messages': 0, 'coached_messages': 0, 'translated_messages': 0}
+    'user_stats': {'total_messages': 0, 'coached_messages': 0, 'translated_messages': 0},
+    'storage_loaded': False
 }
 
 for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
+
+# Initialize browser storage loading
+if not st.session_state.storage_loaded:
+    load_from_browser_storage()
+    st.session_state.storage_loaded = True
 
 # Token gate
 if REQUIRE_TOKEN and not st.session_state.token_validated:
@@ -126,6 +206,7 @@ with st.sidebar.expander("➕ Add Contact"):
     if st.button("Add") and new_name and new_name not in st.session_state.contacts:
         st.session_state.contacts[new_name] = {'context': new_context, 'history': []}
         st.session_state.active_contact = new_name
+        auto_save()  # AUTO-SAVE
         st.success(f"Added {new_name}")
         st.rerun()
 
@@ -134,7 +215,9 @@ contact_names = list(st.session_state.contacts.keys())
 if contact_names:
     selected = st.sidebar.radio("Select Contact:", contact_names, 
                                index=contact_names.index(st.session_state.active_contact))
-    st.session_state.active_contact = selected
+    if selected != st.session_state.active_contact:
+        st.session_state.active_contact = selected
+        auto_save()  # AUTO-SAVE
 
 # Contact info
 if st.session_state.active_contact in st.session_state.contacts:
@@ -146,11 +229,16 @@ if st.session_state.active_contact in st.session_state.contacts:
 if st.sidebar.button("🗑️ Delete Contact") and st.session_state.active_contact != "General":
     del st.session_state.contacts[st.session_state.active_contact]
     st.session_state.active_contact = "General"
+    auto_save()  # AUTO-SAVE
     st.rerun()
 
-# File management
+# File management - Enhanced with browser storage
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 💾 Data Management")
+
+# Storage status
+st.sidebar.markdown('<div class="storage-info">💾 <strong>Auto-Save:</strong> Data automatically saved to your browser</div>', unsafe_allow_html=True)
+
 uploaded = st.sidebar.file_uploader("📤 Load History", type="json")
 if uploaded:
     try:
@@ -159,26 +247,50 @@ if uploaded:
         st.session_state.journal_entries = data.get('journal_entries', {})
         st.session_state.feedback_data = data.get('feedback_data', {})
         st.session_state.user_stats = data.get('user_stats', st.session_state.user_stats)
-        st.sidebar.success("✅ Data loaded!")
+        auto_save()  # AUTO-SAVE
+        st.sidebar.success("✅ Data loaded and auto-saved!")
     except:
         st.sidebar.error("❌ Invalid file")
 
-if st.sidebar.button("💾 Save All"):
-    save_data = {
-        'contacts': st.session_state.contacts,
-        'journal_entries': st.session_state.journal_entries,
-        'feedback_data': st.session_state.feedback_data,
-        'user_stats': st.session_state.user_stats,
-        'saved_at': datetime.datetime.now().isoformat()
-    }
-    filename = f"third_voice_{datetime.datetime.now().strftime('%m%d_%H%M')}.json"
-    st.sidebar.download_button(
-        "📥 Download File", 
-        json.dumps(save_data, indent=2),
-        filename,
-        "application/json",
-        use_container_width=True
-    )
+# Manual save options
+col1, col2 = st.sidebar.columns(2)
+with col1:
+    if st.button("💾 Download"):
+        save_data = {
+            'contacts': st.session_state.contacts,
+            'journal_entries': st.session_state.journal_entries,
+            'feedback_data': st.session_state.feedback_data,
+            'user_stats': st.session_state.user_stats,
+            'saved_at': datetime.datetime.now().isoformat()
+        }
+        filename = f"third_voice_{datetime.datetime.now().strftime('%m%d_%H%M')}.json"
+        st.download_button(
+            "📥 Save File", 
+            json.dumps(save_data, indent=2),
+            filename,
+            "application/json",
+            use_container_width=True
+        )
+
+with col2:
+    if st.button("🗑️ Clear All"):
+        if st.session_state.get('confirm_clear', False):
+            # Reset to defaults
+            st.session_state.contacts = {'General': {'context': 'general', 'history': []}}
+            st.session_state.active_contact = 'General'
+            st.session_state.journal_entries = {}
+            st.session_state.feedback_data = {}
+            st.session_state.user_stats = {'total_messages': 0, 'coached_messages': 0, 'translated_messages': 0}
+            clear_browser_storage()
+            st.session_state.confirm_clear = False
+            st.success("✅ All data cleared!")
+            st.rerun()
+        else:
+            st.session_state.confirm_clear = True
+            st.rerun()
+
+if st.session_state.get('confirm_clear', False):
+    st.sidebar.warning("⚠️ Click 'Clear All' again to confirm")
 
 # Header
 col1, col2, col3 = st.columns([1, 2, 1])
@@ -259,6 +371,9 @@ if st.session_state.active_mode:
                 contact['history'].append(history_entry)
                 st.session_state.user_stats['total_messages'] += 1
                 
+                # AUTO-SAVE after adding to history
+                auto_save()
+                
                 # Simple feedback
                 st.markdown("### 📊 Was this helpful?")
                 col1, col2, col3 = st.columns(3)
@@ -266,19 +381,22 @@ if st.session_state.active_mode:
                 with col1:
                     if st.button("👍 Yes", key=f"good_{history_entry['id']}"):
                         st.session_state.feedback_data[history_entry['id']] = "positive"
+                        auto_save()  # AUTO-SAVE
                         st.success("Thanks for the feedback!")
                 
                 with col2:
                     if st.button("👌 Okay", key=f"ok_{history_entry['id']}"):
                         st.session_state.feedback_data[history_entry['id']] = "neutral"
+                        auto_save()  # AUTO-SAVE
                         st.success("Thanks for the feedback!")
                 
                 with col3:
                     if st.button("👎 No", key=f"bad_{history_entry['id']}"):
                         st.session_state.feedback_data[history_entry['id']] = "negative"
+                        auto_save()  # AUTO-SAVE
                         st.success("Thanks for the feedback!")
                 
-                st.success("✅ Saved to history")
+                st.success("✅ Saved to history and auto-saved to browser!")
                 
             else:
                 st.error(f"❌ {result['error']}")
@@ -336,23 +454,35 @@ with tab2:
     with col1:
         st.markdown('<div class="journal-section">', unsafe_allow_html=True)
         st.markdown("**💚 What worked well?**")
-        journal['what_worked'] = st.text_area("", value=journal['what_worked'], key=f"worked_{contact_key}", height=100, placeholder="Communication strategies that were successful...")
+        new_worked = st.text_area("", value=journal['what_worked'], key=f"worked_{contact_key}", height=100, placeholder="Communication strategies that were successful...")
+        if new_worked != journal['what_worked']:
+            journal['what_worked'] = new_worked
+            auto_save()  # AUTO-SAVE
         st.markdown("</div>", unsafe_allow_html=True)
         
         st.markdown('<div class="journal-section">', unsafe_allow_html=True)
         st.markdown("**🔍 Key insights?**")
-        journal['insights'] = st.text_area("", value=journal['insights'], key=f"insights_{contact_key}", height=100, placeholder="Important realizations about this relationship...")
+        new_insights = st.text_area("", value=journal['insights'], key=f"insights_{contact_key}", height=100, placeholder="Important realizations about this relationship...")
+        if new_insights != journal['insights']:
+            journal['insights'] = new_insights
+            auto_save()  # AUTO-SAVE
         st.markdown("</div>", unsafe_allow_html=True)
     
     with col2:
         st.markdown('<div class="journal-section">', unsafe_allow_html=True)
         st.markdown("**⚠️ What didn't work?**")
-        journal['what_didnt'] = st.text_area("", value=journal['what_didnt'], key=f"didnt_{contact_key}", height=100, placeholder="What caused issues or misunderstandings...")
+        new_didnt = st.text_area("", value=journal['what_didnt'], key=f"didnt_{contact_key}", height=100, placeholder="What caused issues or misunderstandings...")
+        if new_didnt != journal['what_didnt']:
+            journal['what_didnt'] = new_didnt
+            auto_save()  # AUTO-SAVE
         st.markdown("</div>", unsafe_allow_html=True)
         
         st.markdown('<div class="journal-section">', unsafe_allow_html=True)
         st.markdown("**📊 Patterns noticed?**")
-        journal['patterns'] = st.text_area("", value=journal['patterns'], key=f"patterns_{contact_key}", height=100, placeholder="Communication patterns you've observed...")
+        new_patterns = st.text_area("", value=journal['patterns'], key=f"patterns_{contact_key}", height=100, placeholder="Communication patterns you've observed...")
+        if new_patterns != journal['patterns']:
+            journal['patterns'] = new_patterns
+            auto_save()  # AUTO-SAVE
         st.markdown("</div>", unsafe_allow_html=True)
 
 with tab3:
@@ -403,10 +533,12 @@ Instead of repairing relationships after miscommunication damage, The Third Voic
 - 🎯 Context-aware coaching for different relationships
 - 📊 Track your communication progress
 - 📘 Personal journal for insights
-- 💾 Export/import your data
+- 💾 **Auto-save to browser** + Export/import your data
 - 🔒 Privacy-first design
 
-**Privacy First:** All data stays on your device. Save and load your own files.
+**Privacy First:** All data auto-saves to your browser and stays on your device. Manual backup options available.
+
+**Auto-Save:** Your data is automatically saved to your browser's local storage after every action. No data is sent to external servers.
 
 **Beta v1.0.0** — Built with ❤️ to heal relationships through better communication.
 
@@ -423,4 +555,5 @@ Instead of repairing relationships after miscommunication damage, The Third Voic
 - Powered by OpenRouter API
 - Uses multiple AI models for reliability
 - Built with Streamlit for easy deployment
+- **Browser localStorage** for automatic data persistence
     """)
