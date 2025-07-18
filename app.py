@@ -4,6 +4,7 @@ import datetime
 import requests
 import base64
 from streamlit.components.v1 import html
+from urllib.parse import quote, unquote
 
 # Constants
 CONTEXTS = ["general", "romantic", "coparenting", "workplace", "family", "friend"]
@@ -14,14 +15,20 @@ def save_to_browser_storage(data, key="third_voice_data"):
     """Save data to browser localStorage"""
     try:
         json_data = json.dumps(data, separators=(',', ':'))
-        # Escape quotes and newlines for JavaScript
-        escaped_data = json_data.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r')
+        # Encode for URL safety
+        encoded_data = quote(json_data)
         
         html_code = f"""
         <script>
             try {{
-                localStorage.setItem('{key}', "{escaped_data}");
+                localStorage.setItem('{key}', decodeURIComponent('{encoded_data}'));
                 console.log('✅ Data saved to browser storage');
+                
+                // Also save to URL hash for persistence across refreshes
+                const currentUrl = new URL(window.location);
+                currentUrl.searchParams.set('data', '{encoded_data}');
+                window.history.replaceState({{}}, '', currentUrl.toString());
+                
             }} catch (e) {{
                 console.error('❌ Error saving to browser storage:', e);
             }}
@@ -32,31 +39,39 @@ def save_to_browser_storage(data, key="third_voice_data"):
         st.error(f"Error saving to browser storage: {e}")
 
 def load_from_browser_storage():
-    """Load data from browser localStorage and update session state"""
-    html_code = """
-    <script>
-        try {
-            const data = localStorage.getItem('third_voice_data');
-            if (data) {
-                // Parse the data to validate it
-                const parsedData = JSON.parse(data);
-                
-                // Send data to Streamlit
-                window.parent.postMessage({
-                    type: 'FROM_STREAMLIT_STORAGE',
-                    data: parsedData
-                }, '*');
-                
-                console.log('✅ Data loaded from browser storage');
-            } else {
-                console.log('ℹ️ No data found in browser storage');
-            }
-        } catch (e) {
-            console.error('❌ Error loading from browser storage:', e);
-        }
-    </script>
-    """
-    html(html_code, height=0)
+    """Load data from browser localStorage or URL parameters"""
+    try:
+        # First try URL parameters
+        query_params = st.query_params
+        if 'data' in query_params:
+            encoded_data = query_params['data']
+            decoded_data = unquote(encoded_data)
+            return json.loads(decoded_data)
+        
+        # If no URL data, try to trigger localStorage retrieval
+        html_code = f"""
+        <script>
+            try {{
+                const data = localStorage.getItem('third_voice_data');
+                if (data) {{
+                    const encoded = encodeURIComponent(data);
+                    const currentUrl = new URL(window.location);
+                    currentUrl.searchParams.set('data', encoded);
+                    window.location.href = currentUrl.toString();
+                }} else {{
+                    console.log('ℹ️ No data found in browser storage');
+                }}
+            }} catch (e) {{
+                console.error('❌ Error loading from browser storage:', e);
+            }}
+        </script>
+        """
+        html(html_code, height=0)
+        return None
+        
+    except Exception as e:
+        st.error(f"Error loading from browser storage: {e}")
+        return None
 
 def auto_save():
     """Automatically save current session state to browser storage"""
@@ -75,6 +90,9 @@ def clear_browser_storage():
     html_code = """
     <script>
         localStorage.removeItem('third_voice_data');
+        const currentUrl = new URL(window.location);
+        currentUrl.searchParams.delete('data');
+        window.history.replaceState({}, '', currentUrl.toString());
         console.log('🗑️ Browser storage cleared');
     </script>
     """
@@ -108,17 +126,24 @@ defaults = {
     'journal_entries': {},
     'feedback_data': {},
     'user_stats': {'total_messages': 0, 'coached_messages': 0, 'translated_messages': 0},
-    'storage_loaded': False
+    'data_loaded': False
 }
 
+# Initialize session state with defaults
 for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# Initialize browser storage loading
-if not st.session_state.storage_loaded:
-    load_from_browser_storage()
-    st.session_state.storage_loaded = True
+# Load data from browser storage on first run
+if not st.session_state.data_loaded:
+    loaded_data = load_from_browser_storage()
+    if loaded_data:
+        st.session_state.contacts = loaded_data.get('contacts', st.session_state.contacts)
+        st.session_state.journal_entries = loaded_data.get('journal_entries', st.session_state.journal_entries)
+        st.session_state.feedback_data = loaded_data.get('feedback_data', st.session_state.feedback_data)
+        st.session_state.user_stats = loaded_data.get('user_stats', st.session_state.user_stats)
+        st.success("✅ Data loaded from browser storage!")
+    st.session_state.data_loaded = True
 
 # Token gate
 if REQUIRE_TOKEN and not st.session_state.token_validated:
@@ -206,7 +231,7 @@ with st.sidebar.expander("➕ Add Contact"):
     if st.button("Add") and new_name and new_name not in st.session_state.contacts:
         st.session_state.contacts[new_name] = {'context': new_context, 'history': []}
         st.session_state.active_contact = new_name
-        auto_save()  # AUTO-SAVE
+        auto_save()
         st.success(f"Added {new_name}")
         st.rerun()
 
@@ -217,7 +242,7 @@ if contact_names:
                                index=contact_names.index(st.session_state.active_contact))
     if selected != st.session_state.active_contact:
         st.session_state.active_contact = selected
-        auto_save()  # AUTO-SAVE
+        auto_save()
 
 # Contact info
 if st.session_state.active_contact in st.session_state.contacts:
@@ -229,10 +254,10 @@ if st.session_state.active_contact in st.session_state.contacts:
 if st.sidebar.button("🗑️ Delete Contact") and st.session_state.active_contact != "General":
     del st.session_state.contacts[st.session_state.active_contact]
     st.session_state.active_contact = "General"
-    auto_save()  # AUTO-SAVE
+    auto_save()
     st.rerun()
 
-# File management - Enhanced with browser storage
+# File management
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 💾 Data Management")
 
@@ -247,7 +272,7 @@ if uploaded:
         st.session_state.journal_entries = data.get('journal_entries', {})
         st.session_state.feedback_data = data.get('feedback_data', {})
         st.session_state.user_stats = data.get('user_stats', st.session_state.user_stats)
-        auto_save()  # AUTO-SAVE
+        auto_save()
         st.sidebar.success("✅ Data loaded and auto-saved!")
     except:
         st.sidebar.error("❌ Invalid file")
@@ -381,19 +406,19 @@ if st.session_state.active_mode:
                 with col1:
                     if st.button("👍 Yes", key=f"good_{history_entry['id']}"):
                         st.session_state.feedback_data[history_entry['id']] = "positive"
-                        auto_save()  # AUTO-SAVE
+                        auto_save()
                         st.success("Thanks for the feedback!")
                 
                 with col2:
                     if st.button("👌 Okay", key=f"ok_{history_entry['id']}"):
                         st.session_state.feedback_data[history_entry['id']] = "neutral"
-                        auto_save()  # AUTO-SAVE
+                        auto_save()
                         st.success("Thanks for the feedback!")
                 
                 with col3:
                     if st.button("👎 No", key=f"bad_{history_entry['id']}"):
                         st.session_state.feedback_data[history_entry['id']] = "negative"
-                        auto_save()  # AUTO-SAVE
+                        auto_save()
                         st.success("Thanks for the feedback!")
                 
                 st.success("✅ Saved to history and auto-saved to browser!")
@@ -457,33 +482,33 @@ with tab2:
         new_worked = st.text_area("", value=journal['what_worked'], key=f"worked_{contact_key}", height=100, placeholder="Communication strategies that were successful...")
         if new_worked != journal['what_worked']:
             journal['what_worked'] = new_worked
-            auto_save()  # AUTO-SAVE
-        st.markdown("</div>", unsafe_allow_html=True)
+            auto_save()
+        st.markdown('</div>', unsafe_allow_html=True)
         
         st.markdown('<div class="journal-section">', unsafe_allow_html=True)
-        st.markdown("**🔍 Key insights?**")
-        new_insights = st.text_area("", value=journal['insights'], key=f"insights_{contact_key}", height=100, placeholder="Important realizations about this relationship...")
+        st.markdown("**💡 Key insights**")
+        new_insights = st.text_area("", value=journal['insights'], key=f"insights_{contact_key}", height=100, placeholder="What did you learn about communication with this person?...")
         if new_insights != journal['insights']:
             journal['insights'] = new_insights
-            auto_save()  # AUTO-SAVE
-        st.markdown("</div>", unsafe_allow_html=True)
+            auto_save()
+        st.markdown('</div>', unsafe_allow_html=True)
     
     with col2:
         st.markdown('<div class="journal-section">', unsafe_allow_html=True)
-        st.markdown("**⚠️ What didn't work?**")
-        new_didnt = st.text_area("", value=journal['what_didnt'], key=f"didnt_{contact_key}", height=100, placeholder="What caused issues or misunderstandings...")
+        st.markdown("**❌ What didn't work?**")
+        new_didnt = st.text_area("", value=journal['what_didnt'], key=f"didnt_{contact_key}", height=100, placeholder="Approaches that caused issues...")
         if new_didnt != journal['what_didnt']:
             journal['what_didnt'] = new_didnt
-            auto_save()  # AUTO-SAVE
-        st.markdown("</div>", unsafe_allow_html=True)
+            auto_save()
+        st.markdown('</div>', unsafe_allow_html=True)
         
         st.markdown('<div class="journal-section">', unsafe_allow_html=True)
-        st.markdown("**📊 Patterns noticed?**")
-        new_patterns = st.text_area("", value=journal['patterns'], key=f"patterns_{contact_key}", height=100, placeholder="Communication patterns you've observed...")
+        st.markdown("**🔄 Patterns noticed**")
+        new_patterns = st.text_area("", value=journal['patterns'], key=f"patterns_{contact_key}", height=100, placeholder="Recurring themes or behaviors...")
         if new_patterns != journal['patterns']:
             journal['patterns'] = new_patterns
-            auto_save()  # AUTO-SAVE
-        st.markdown("</div>", unsafe_allow_html=True)
+            auto_save()
+        st.markdown('</div>', unsafe_allow_html=True)
 
 with tab3:
     st.markdown("### 📊 Your Communication Stats")
@@ -491,69 +516,60 @@ with tab3:
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.markdown(f'<div class="stats-card"><h3>{st.session_state.user_stats["total_messages"]}</h3><p>Total Messages</p></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="stats-card"><h2>{st.session_state.user_stats["total_messages"]}</h2><p>Total Messages</p></div>', unsafe_allow_html=True)
     
     with col2:
-        st.markdown(f'<div class="stats-card"><h3>{st.session_state.user_stats["coached_messages"]}</h3><p>Messages Coached</p></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="stats-card"><h2>{st.session_state.user_stats["coached_messages"]}</h2><p>Messages Coached</p></div>', unsafe_allow_html=True)
     
     with col3:
-        st.markdown(f'<div class="stats-card"><h3>{st.session_state.user_stats["translated_messages"]}</h3><p>Messages Understood</p></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="stats-card"><h2>{st.session_state.user_stats["translated_messages"]}</h2><p>Messages Understood</p></div>', unsafe_allow_html=True)
     
-    # Contact breakdown
-    st.markdown("### 👥 By Contact")
-    for name, contact in st.session_state.contacts.items():
-        if contact['history']:
-            coached = sum(1 for h in contact['history'] if h['type'] == 'coach')
-            translated = sum(1 for h in contact['history'] if h['type'] == 'translate')
-            st.markdown(f"**{name}:** {len(contact['history'])} total ({coached} coached, {translated} understood)")
+    # Contact activity
+    st.markdown("### 📞 Contact Activity")
+    contact_stats = []
+    for name, data in st.session_state.contacts.items():
+        contact_stats.append({
+            'name': name,
+            'context': data['context'],
+            'messages': len(data['history']),
+            'coach_count': len([h for h in data['history'] if h['type'] == 'coach']),
+            'translate_count': len([h for h in data['history'] if h['type'] == 'translate'])
+        })
     
-    # Feedback summary
-    if st.session_state.feedback_data:
-        st.markdown("### 📝 Feedback Summary")
-        positive = sum(1 for f in st.session_state.feedback_data.values() if f == "positive")
-        neutral = sum(1 for f in st.session_state.feedback_data.values() if f == "neutral")
-        negative = sum(1 for f in st.session_state.feedback_data.values() if f == "negative")
-        
-        st.markdown(f"👍 Positive: {positive} | 👌 Neutral: {neutral} | 👎 Negative: {negative}")
+    contact_stats.sort(key=lambda x: x['messages'], reverse=True)
+    
+    for stat in contact_stats:
+        with st.expander(f"**{stat['name']}** ({stat['context']}) - {stat['messages']} messages"):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Messages Coached", stat['coach_count'])
+            with col2:
+                st.metric("Messages Understood", stat['translate_count'])
 
 with tab4:
-    st.markdown("""### ℹ️ About The Third Voice
+    st.markdown("### ℹ️ About The Third Voice")
+    st.markdown("""
+    **The Third Voice** is your AI-powered communication coach that helps you:
     
-**The communication coach that's there when you need it most.**
-
-Instead of repairing relationships after miscommunication damage, The Third Voice helps you communicate better in real-time.
-
-**How it works:**
-1. **Select your contact** - Each relationship gets personalized coaching
-2. **Coach your messages** - Improve what you're about to send
-3. **Understand their messages** - Decode the real meaning behind their words
-4. **Build better patterns** - Journal and learn from each interaction
-
-**Key Features:**
-- 🎯 Context-aware coaching for different relationships
-- 📊 Track your communication progress
-- 📘 Personal journal for insights
-- 💾 **Auto-save to browser** + Export/import your data
-- 🔒 Privacy-first design
-
-**Privacy First:** All data auto-saves to your browser and stays on your device. Manual backup options available.
-
-**Auto-Save:** Your data is automatically saved to your browser's local storage after every action. No data is sent to external servers.
-
-**Beta v1.0.0** — Built with ❤️ to heal relationships through better communication.
-
-*"When both people are talking from pain, someone needs to be the third voice."*
-
----
-
-**Support & Community:**
-- 💬 Join discussions at our community forum
-- 📧 Report bugs or suggest features
-- 🌟 Share your success stories
-
-**Technical Details:**
-- Powered by OpenRouter API
-- Uses multiple AI models for reliability
-- Built with Streamlit for easy deployment
-- **Browser localStorage** for automatic data persistence
+    - 🚀 **Improve your messages** before sending them
+    - 🔍 **Understand what others really mean** in their messages
+    - 📝 **Track your communication patterns** with different people
+    - 📊 **Learn from your communication history**
+    
+    #### 🎯 Relationship Contexts
+    - **General**: Everyday communication
+    - **Romantic**: Messages with your partner
+    - **Coparenting**: Child-focused communication
+    - **Workplace**: Professional interactions
+    - **Family**: Family relationship dynamics
+    - **Friend**: Friendship communication
+    
+    #### 💾 Data Storage
+    Your data is automatically saved to your browser's local storage and persists across sessions. You can also manually export/import your data as JSON files.
+    
+    #### 🔒 Privacy
+    All data stays in your browser. Nothing is stored on external servers except for AI processing.
+    
+    ---
+    *Created by Predrag Mirković*
     """)
