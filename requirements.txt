@@ -1,2 +1,10 @@
-streamlit
-requests
+# Core Requirements
+streamlit==1.32.0
+requests==2.31.0
+python-dotenv==1.0.0
+
+# Optional Extras (uncomment if needed)
+#openai==1.12.0
+#python-multipart==0.0.6  # For file uploads
+#pyPDF2==3.0.1  # For PDF export
+#gtts==2.4.0  # Text-to-speech
