@@ -2,18 +2,13 @@ import streamlit as st
 import json
 import datetime
 import requests
-from pathlib import Path
 
-# ========================
-# CONSTANTS & CONFIG
-# ========================
+# Constants
 CONTEXTS = ["general", "romantic", "coparenting", "workplace", "family", "friend"]
 REQUIRE_TOKEN = False
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# ========================
-# CSS STYLES
-# ========================
+# CSS Styles
 st.markdown("""
 <style>
 .contact-card {background:rgba(76,175,80,0.1);padding:0.8rem;border-radius:8px;border-left:4px solid #4CAF50;margin:0.5rem 0;cursor:pointer}
@@ -28,29 +23,10 @@ st.markdown("""
 .main-actions button {flex:1;padding:0.8rem;font-size:1.1rem}
 .feedback-section {background:rgba(0,150,136,0.1);padding:1rem;border-radius:8px;margin:1rem 0}
 .stats-card {background:rgba(63,81,181,0.1);padding:1rem;border-radius:8px;margin:0.5rem 0;text-align:center}
-
-/* Auto-expanding textarea */
-.stTextArea textarea {
-    min-height: 120px;
-    resize: vertical;
-    transition: height 0.2s ease;
-}
-
-/* Mobile responsiveness */
-@media screen and (max-width: 768px) {
-    .stTextArea textarea {
-        min-height: 100px;
-    }
-    .main-actions {
-        flex-direction: column;
-    }
-}
 </style>
 """, unsafe_allow_html=True)
 
-# ========================
-# SESSION MANAGEMENT
-# ========================
+# Initialize Session State
 def initialize_session():
     defaults = {
         'token_validated': not REQUIRE_TOKEN,
@@ -65,6 +41,9 @@ def initialize_session():
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
 
+initialize_session()
+
+# Token Validation
 def validate_token():
     if REQUIRE_TOKEN and not st.session_state.token_validated:
         st.markdown("# 🎙️ The Third Voice\n*Your AI Communication Coach*")
@@ -79,9 +58,9 @@ def validate_token():
                 st.error("Invalid token")
         st.stop()
 
-# ========================
-# CORE FUNCTIONALITY
-# ========================
+validate_token()
+
+# API Interaction
 def get_ai_response(message, context, is_received=False):
     if not st.session_state.api_key:
         return {"error": "No API key"}
@@ -104,7 +83,7 @@ def get_ai_response(message, context, is_received=False):
 
     models = [
         "google/gemma-2-9b-it:free",
-        "meta-llama/llama-3.2-3b-instruct:free", 
+        "meta-llama/llama-3.2-3b-instruct:free",
         "microsoft/phi-3-mini-128k-instruct:free"
     ]
 
@@ -134,9 +113,7 @@ def get_ai_response(message, context, is_received=False):
 
     return {"error": "All models failed"}
 
-# ========================
-# UI COMPONENTS
-# ========================
+# Sidebar: Contact Management
 def render_sidebar():
     st.sidebar.markdown("### 👥 Your Contacts")
     with st.sidebar.expander("➕ Add Contact"):
@@ -166,15 +143,18 @@ def render_sidebar():
     if uploaded:
         try:
             data = json.load(uploaded)
+            # Clear existing data to avoid conflicts
             st.session_state.contacts = data.get('contacts', {'General': {'context': 'general', 'history': []}})
             st.session_state.journal_entries = data.get('journal_entries', {})
             st.session_state.feedback_data = data.get('feedback_data', {})
             st.session_state.user_stats = data.get('user_stats', {'total_messages': 0, 'coached_messages': 0, 'translated_messages': 0})
+            # Ensure active_contact is valid
             if st.session_state.active_contact not in st.session_state.contacts:
                 st.session_state.active_contact = "General"
             st.sidebar.success("✅ Data loaded!")
+            # Clear the file uploader to prevent re-processing
             st.session_state['file_uploader'] = None
-            st.rerun()
+            st.rerun()  # Force rerun to refresh UI with loaded data
         except Exception as e:
             st.sidebar.error(f"❌ Invalid file: {str(e)}")
 
@@ -189,6 +169,9 @@ def render_sidebar():
         filename = f"third_voice_{datetime.datetime.now().strftime('%m%d_%H%M')}.json"
         st.sidebar.download_button("📥 Download File", json.dumps(save_data, indent=2), filename, "application/json", use_container_width=True)
 
+render_sidebar()
+
+# Main UI
 def render_main():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -209,10 +192,9 @@ def render_main():
             st.session_state.active_mode = "translate"
             st.rerun()
 
-def calculate_textarea_height(text):
-    line_count = text.count('\n') + 1 if text else 1
-    return max(120, min(400, line_count * 20))  # Between 120px and 400px
+render_main()
 
+# Message Processing
 def render_message_input():
     if not st.session_state.active_mode:
         return
@@ -225,19 +207,8 @@ def render_message_input():
     input_class = "user-msg" if mode == "coach" else "contact-msg"
     st.markdown(f'<div class="{input_class}"><strong>{"📤 Your message to send:" if mode == "coach" else "📥 Message you received:"}</strong></div>', unsafe_allow_html=True)
 
-    # Get current message or empty string
-    current_message = st.session_state.get(f"{mode}_input", "")
-    
-    # Calculate dynamic height
-    textarea_height = calculate_textarea_height(current_message)
-
-    message = st.text_area(
-        "",
-        height=textarea_height,
-        key=f"{mode}_input",
-        label_visibility="collapsed",
-        placeholder="Type your message here..." if mode == "coach" else "Paste their message here..."
-    )
+    message = st.text_area("", height=120, key=f"{mode}_input", label_visibility="collapsed",
+                           placeholder="Type your message here..." if mode == "coach" else "Paste their message here...")
 
     col1, col2 = st.columns([3, 1])
     with col1:
@@ -288,6 +259,9 @@ def render_message_input():
     elif process_btn:
         st.warning("⚠️ Please enter a message first.")
 
+render_message_input()
+
+# Tabs
 def render_tabs():
     tab1, tab2, tab3, tab4 = st.tabs(["📜 History", "📘 Journal", "📊 Stats", "ℹ️ About"])
 
@@ -334,11 +308,11 @@ def render_tabs():
             journal['insights'] = st.text_area("", value=journal['insights'], key=f"insights_{contact_key}", height=100, placeholder="Important realizations about this relationship...")
 
         with col2:
-            st.markdown('<div class="journal-section">**⚠️ What didn\'t work?**</div>', unsafe_allow_html=True)
+            st.markdown('<div class="journal-section">**⚠️ What didn’t work?**</div>', unsafe_allow_html=True)
             journal['what_didnt'] = st.text_area("", value=journal['what_didnt'], key=f"didnt_{contact_key}", height=100, placeholder="What caused issues or misunderstandings...")
             st.markdown('<div class="journal-section">**📊 Patterns noticed?**</div>', unsafe_allow_html=True)
             journal['patterns'] = st.text_area("", value=journal['patterns'], key=f"patterns_{contact_key}", height=100, placeholder="Communication patterns you've observed...")
-    
+
     with tab3:
         st.markdown("### 📊 Your Communication Stats")
         col1, col2, col3 = st.columns(3)
@@ -396,27 +370,4 @@ def render_tabs():
         - Built with Streamlit for easy deployment
         """)
 
-# ========================
-# MAIN APP EXECUTION
-# ========================
-def main():
-    st.set_page_config(
-        page_title="The Third Voice",
-        page_icon="🎙️",
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
-    
-    initialize_session()
-    validate_token()
-    
-    render_sidebar()
-    render_main()
-    
-    if st.session_state.active_mode:
-        render_message_input()
-    else:
-        render_tabs()
-
-if __name__ == "__main__":
-    main()
+render_tabs()
