@@ -175,19 +175,24 @@ st.markdown("""
     color: black !important;
 }
 
-/* Force light theme */
+/* Header elements */
+[data-testid="stToolbar"] {
+    visibility: visible !important;
+}
+[data-testid="stDecoration"] {
+    visibility: visible !important;
+}
+[data-testid="baseButton-header"] {
+    visibility: visible !important;
+}
+
+/* Force light theme but keep header elements */
 [data-testid="stAppViewContainer"] {
     background-color: white !important;
     color: black !important;
 }
 [data-testid="stHeader"] {
     background-color: white !important;
-}
-[data-testid="stToolbar"] {
-    display: none !important;
-}
-[data-testid="stSidebar"] {
-    background-color: #f7f7f8 !important;
 }
 </style>
 """, unsafe_allow_html=True)
