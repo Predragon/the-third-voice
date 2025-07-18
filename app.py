@@ -4,11 +4,11 @@ import datetime
 import requests
 
 # Constants
-CONTEXTS = ["general", "romantic", "coparenting", "workplace", "family", "friend"]
+CONTEXTS = ["romantic", "coparenting", "workplace", "family", "friend"]  # Removed "general"
 REQUIRE_TOKEN = False
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# CSS Styles (Simplified and cleaned for better experience)
+# CSS Styles (Tailored for family-friendly, mission-driven experience)
 st.markdown("""
 <style>
 .contact-card {background:rgba(76,175,80,0.1);padding:0.8rem;border-radius:8px;border-left:4px solid #4CAF50;margin:0.5rem 0;cursor:pointer}
@@ -30,8 +30,8 @@ def initialize_session():
     defaults = {
         'token_validated': not REQUIRE_TOKEN,
         'api_key': st.secrets.get("OPENROUTER_API_KEY", ""),
-        'contacts': {'General': {'context': 'general', 'history': []}},
-        'active_contact': 'General',
+        'contacts': {context: {'context': context, 'history': []} for context in CONTEXTS},  # Pre-populate with all contexts
+        'active_contact': CONTEXTS[0],  # Default to first context
         'journal_entries': {},
         'feedback_data': {},
         'user_stats': {'total_messages': 0, 'coached_messages': 0, 'translated_messages': 0},
@@ -65,7 +65,6 @@ def get_ai_response(message, context, is_received=False):
         return {"error": "No API key"}
 
     prompts = {
-        "general": "You are an emotionally intelligent communication coach. Help improve this message for clarity and empathy.",
         "romantic": "You help reframe romantic messages with empathy and clarity while maintaining intimacy.",
         "coparenting": "You offer emotionally safe responses for coparenting focused on the children's wellbeing.",
         "workplace": "You translate workplace messages for professional tone and clear intent.",
@@ -73,7 +72,7 @@ def get_ai_response(message, context, is_received=False):
         "friend": "You assist with friendship communication to strengthen bonds and resolve conflicts."
     }
 
-    system_prompt = f"{prompts.get(context, prompts['general'])} {'Analyze this received message and suggest how to respond.' if is_received else 'Improve this message before sending.'}"
+    system_prompt = f"{prompts.get(context, prompts['family'])} {'Analyze this received message and suggest how to respond.' if is_received else 'Improve this message before sending.'}"
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -112,10 +111,10 @@ def get_ai_response(message, context, is_received=False):
 
     return {"error": "All models failed"}
 
-# Sidebar: Contact Management
+# Sidebar: Contact Management (Pre-populated with contexts)
 def render_sidebar():
-    st.sidebar.markdown("### 👥 Your Contacts")
-    with st.sidebar.expander("➕ Add Contact"):
+    st.sidebar.markdown("### 👥 Your Contexts")
+    with st.sidebar.expander("➕ Add Custom Contact"):
         new_name = st.text_input("Name:")
         new_context = st.selectbox("Relationship:", CONTEXTS)
         if st.button("Add") and new_name and new_name not in st.session_state.contacts:
@@ -126,15 +125,15 @@ def render_sidebar():
 
     contact_names = list(st.session_state.contacts.keys())
     if contact_names:
-        selected = st.sidebar.radio("Select Contact:", contact_names, index=contact_names.index(st.session_state.active_contact))
+        selected = st.sidebar.radio("Select Context:", contact_names, index=contact_names.index(st.session_state.active_contact))
         st.session_state.active_contact = selected
 
     contact = st.session_state.contacts[st.session_state.active_contact]
     st.sidebar.markdown(f"**Context:** {contact['context']}\n**Messages:** {len(contact['history'])}")
 
-    if st.sidebar.button("🗑️ Delete Contact") and st.session_state.active_contact != "General":
+    if st.sidebar.button("🗑️ Delete Contact") and st.session_state.active_contact not in CONTEXTS:
         del st.session_state.contacts[st.session_state.active_contact]
-        st.session_state.active_contact = "General"
+        st.session_state.active_contact = CONTEXTS[0]
         st.rerun()
 
     st.sidebar.markdown("---\n### 💾 Data Management")
@@ -142,11 +141,11 @@ def render_sidebar():
     if uploaded:
         try:
             data = json.load(uploaded)
-            st.session_state.contacts = data.get('contacts', {'General': {'context': 'general', 'history': []}})
+            st.session_state.contacts = data.get('contacts', {context: {'context': context, 'history': []} for context in CONTEXTS})
             st.session_state.journal_entries = data.get('journal_entries', {})
             st.session_state.feedback_data = data.get('feedback_data', {})
             if st.session_state.active_contact not in st.session_state.contacts:
-                st.session_state.active_contact = "General"
+                st.session_state.active_contact = CONTEXTS[0]
             st.sidebar.success("✅ Data loaded!")
             st.session_state['file_uploader'] = None
             st.rerun()
@@ -175,7 +174,7 @@ def render_main():
             st.markdown("# 🎙️ The Third Voice")
         st.markdown("<div style='text-align: center'><i>Created by Predrag Mirković</i></div>", unsafe_allow_html=True)
 
-    st.markdown(f"### 💬 Communicating with: **{st.session_state.active_contact}**")
+    st.markdown(f"### 💬 Context: **{st.session_state.active_contact}**")
     col1, col2 = st.columns(2)
     with col1:
         if st.button("📤 Coach My Message", type="primary", use_container_width=True):
@@ -255,7 +254,7 @@ def render_message_input():
 
 render_message_input()
 
-# Tabs (Removed Stats tab)
+# Tabs
 def render_tabs():
     tab1, tab2, tab4 = st.tabs(["📜 History", "📘 Journal", "ℹ️ About"])
 
@@ -311,30 +310,28 @@ def render_tabs():
         st.markdown("""
         ### ℹ️ About The Third Voice
         **The communication coach that's there when you need it most.**
-        Instead of repairing relationships after miscommunication damage, The Third Voice helps you communicate better in real-time.
+        Born from a father's fight to return to his daughter, The Third Voice heals families through better communication.
         **How it works:**
-        1. **Select your contact** - Each relationship gets personalized coaching
-        2. **Coach your messages** - Improve what you're about to send
-        3. **Understand their messages** - Decode the real meaning behind their words
-        4. **Build better patterns** - Journal and learn from each interaction
+        1. **Select your context** - Personalized coaching for every relationship
+        2. **Coach your messages** - Improve what you send
+        3. **Understand their words** - Decode the meaning behind their messages
+        4. **Build better patterns** - Journal to strengthen family bonds
         **Key Features:**
-        - 🎯 Context-aware coaching for different relationships
-        - 📊 Track your communication progress
+        - 🎯 Context-aware coaching for real-life relationships
         - 📘 Personal journal for insights
         - 💾 Export/import your data
         - 🔒 Privacy-first design
         **Privacy First:** All data stays on your device. Save and load your own files.
-        **Beta v1.0.0** — Built with ❤️ to heal relationships through better communication.
+        **Beta v1.0.0** — Built with ❤️ to reunite families and heal relationships.
         *"When both people are talking from pain, someone needs to be the third voice."*
         ---
         **Support & Community:**
-        - 💬 Join discussions at our community forum
+        - 💬 Join our open-source forum
         - 📧 Report bugs or suggest features
-        - 🌟 Share your success stories
+        - 🌟 Share your family success stories
         **Technical Details:**
         - Powered by OpenRouter API
-        - Uses multiple AI models for reliability
-        - Built with Streamlit for easy deployment
+        - Built with Streamlit on an Android phone
         """)
 
 render_tabs()
