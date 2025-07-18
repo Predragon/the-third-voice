@@ -53,9 +53,11 @@ st.markdown("""
     align-items: center;
     margin-bottom: 0.5rem;
     font-weight: 600;
+    color: black !important;
 }
 .message-content {
     line-height: 1.5;
+    color: black !important;
 }
 
 /* Buttons */
@@ -64,6 +66,7 @@ st.markdown("""
     padding: 0.5rem 1rem;
     border: 1px solid #e5e5e6;
     background: white;
+    color: black !important;
 }
 .stButton>button:hover {
     background: #f7f7f8;
@@ -75,6 +78,7 @@ st.markdown("""
 }
 .primary-button:hover {
     background: #16a369 !important;
+    color: white !important;
 }
 
 /* Input */
@@ -82,6 +86,7 @@ st.markdown("""
     border-radius: 8px;
     padding: 1rem;
     border: 1px solid #e5e5e6;
+    color: black !important;
 }
 .stTextArea>div>div>textarea:focus {
     border-color: #19c37d;
@@ -94,6 +99,7 @@ st.markdown("""
     border-radius: 8px;
     margin: 0.25rem 0;
     cursor: pointer;
+    color: black !important;
 }
 .sidebar-item:hover {
     background: #e5e5e6;
@@ -120,6 +126,7 @@ st.markdown("""
 [data-testid="stTab"] button {
     padding: 0.5rem 1rem;
     border-radius: 8px 8px 0 0;
+    color: black !important;
 }
 [data-testid="stTab"] button:hover {
     background: #f7f7f8;
@@ -129,6 +136,7 @@ st.markdown("""
     border-color: #e5e5e6;
     border-bottom-color: white;
     font-weight: 600;
+    color: black !important;
 }
 
 /* Stats Cards */
@@ -139,11 +147,13 @@ st.markdown("""
     padding: 1rem;
     text-align: center;
     margin: 0.5rem 0;
+    color: black !important;
 }
 .stats-number {
     font-size: 1.5rem;
     font-weight: 600;
     margin-bottom: 0.25rem;
+    color: black !important;
 }
 .stats-label {
     font-size: 0.85rem;
@@ -157,11 +167,27 @@ st.markdown("""
     border-radius: 8px;
     padding: 1rem;
     margin: 0.5rem 0;
+    color: black !important;
 }
 .journal-title {
     font-weight: 600;
     margin-bottom: 0.5rem;
-    color: #19c37d;
+    color: black !important;
+}
+
+/* Force light theme */
+[data-testid="stAppViewContainer"] {
+    background-color: white !important;
+    color: black !important;
+}
+[data-testid="stHeader"] {
+    background-color: white !important;
+}
+[data-testid="stToolbar"] {
+    display: none !important;
+}
+[data-testid="stSidebar"] {
+    background-color: #f7f7f8 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -270,7 +296,7 @@ def render_sidebar():
     <div style="display: flex; align-items: center; margin-bottom: 1.5rem;">
         <h1 style="margin: 0;">🎙️</h1>
         <div style="margin-left: 0.5rem;">
-            <div style="font-weight: 600;">Third Voice</div>
+            <div style="font-weight: 600; color: black;">Third Voice</div>
             <div style="font-size: 0.8rem; color: #6e6e80;">Communication Coach</div>
         </div>
     </div>
@@ -330,7 +356,7 @@ def render_chat_interface():
     st.markdown(f"""
     <div class="chat-container">
         <div style="text-align: center; margin-bottom: 1rem;">
-            <h3>💬 {st.session_state.active_contact}</h3>
+            <h3 style="color: black;">💬 {st.session_state.active_contact}</h3>
             <p style="color: #6e6e80; font-size: 0.9rem;">
                 {st.session_state.contacts[st.session_state.active_contact]['context'].title()} context
             </p>
@@ -457,7 +483,7 @@ def render_message_input():
                 st.markdown("""
                 <div class="chat-container">
                     <div style="text-align: center; margin: 1rem 0;">
-                        <p>Was this helpful?</p>
+                        <p style="color: black;">Was this helpful?</p>
                         <div style="display: flex; gap: 0.5rem; justify-content: center;">
                 """, unsafe_allow_html=True)
                 
@@ -587,7 +613,7 @@ def render_tabs():
                 translated = sum(1 for h in contact['history'] if h['type'] == 'translate')
                 st.markdown(f"""
                 <div class="ai-message" style="margin-bottom: 0.5rem;">
-                    <div style="font-weight: 600;">{name}</div>
+                    <div style="font-weight: 600; color: black;">{name}</div>
                     <div style="font-size: 0.9rem; color: #6e6e80;">
                         {len(contact['history'])} total • {coached} coached • {translated} understood
                     </div>
