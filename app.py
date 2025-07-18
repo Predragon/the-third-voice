@@ -384,11 +384,4 @@ else:
 # 🌟 Footer with love and mission
 st.markdown("---")
 st.markdown("""
-<div style='text-align: center; padding: 2rem; background: linear-gradient(45deg, #667eea, #764ba2); border-radius: 15px; color: white; margin: 2rem 0;'>
-    <h3>💝 Built with Love</h3>
-    <p><i>Created by a father fighting to reconnect with his 6-year-old daughter Samantha</i></p>
-    <p>🌟 <strong>Open Source</strong> - Because healing should be accessible to all families</p>
-    <p>💕 Every message you heal brings families closer together</p>
-    <p><small>You're not just fixing communication - you're building bridges of love 🌈</small></p>
-</div>
-""", unsafe_allow_html=True)
+<div style='text-align: center; padding: 2rem; background: linear-gradient(45deg, #6
