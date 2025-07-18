@@ -139,27 +139,6 @@ st.markdown("""
     color: black !important;
 }
 
-/* Stats Cards */
-.stats-card {
-    background: white;
-    border: 1px solid #e5e5e6;
-    border-radius: 8px;
-    padding: 1rem;
-    text-align: center;
-    margin: 0.5rem 0;
-    color: black !important;
-}
-.stats-number {
-    font-size: 1.5rem;
-    font-weight: 600;
-    margin-bottom: 0.25rem;
-    color: black !important;
-}
-.stats-label {
-    font-size: 0.85rem;
-    color: #6e6e80;
-}
-
 /* Journal Entries */
 .journal-section {
     background: white;
@@ -507,7 +486,7 @@ def render_message_input():
 
 # Tabs
 def render_tabs():
-    tab1, tab2, tab3 = st.tabs(["📜 History", "📘 Journal", "📊 Stats"])
+    tab1, tab2 = st.tabs(["📜 History", "📘 Journal"])
 
     with tab1:
         st.markdown(f"### History with {st.session_state.active_contact}")
@@ -594,60 +573,6 @@ def render_tabs():
         </div>
         """, unsafe_allow_html=True)
         journal['patterns'] = st.text_area("", value=journal['patterns'], key=f"patterns_{contact_key}", height=100, label_visibility="collapsed")
-
-    with tab3:
-        st.markdown("### Your Communication Stats")
-        col1, col2, col3 = st.columns(3)
-        for idx, (stat, label) in enumerate([
-            (st.session_state.user_stats["total_messages"], "Total Messages"),
-            (st.session_state.user_stats["coached_messages"], "Messages Coached"),
-            (st.session_state.user_stats["translated_messages"], "Messages Understood")
-        ]):
-            with [col1, col2, col3][idx]:
-                st.markdown(f"""
-                <div class="stats-card">
-                    <div class="stats-number">{stat}</div>
-                    <div class="stats-label">{label}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-        st.markdown("### By Contact")
-        for name, contact in st.session_state.contacts.items():
-            if contact['history']:
-                coached = sum(1 for h in contact['history'] if h['type'] == 'coach')
-                translated = sum(1 for h in contact['history'] if h['type'] == 'translate')
-                st.markdown(f"""
-                <div class="ai-message" style="margin-bottom: 0.5rem;">
-                    <div style="font-weight: 600; color: black;">{name}</div>
-                    <div style="font-size: 0.9rem; color: #6e6e80;">
-                        {len(contact['history'])} total • {coached} coached • {translated} understood
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-        if st.session_state.feedback_data:
-            st.markdown("### Feedback Summary")
-            feedback_counts = {
-                "positive": sum(1 for f in st.session_state.feedback_data.values() if f == "positive"),
-                "neutral": sum(1 for f in st.session_state.feedback_data.values() if f == "neutral"),
-                "negative": sum(1 for f in st.session_state.feedback_data.values() if f == "negative")
-            }
-            st.markdown(f"""
-            <div style="display: flex; gap: 1rem; justify-content: center;">
-                <div style="text-align: center;">
-                    <div style="font-size: 1.2rem;">👍</div>
-                    <div>{feedback_counts['positive']}</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 1.2rem;">👌</div>
-                    <div>{feedback_counts['neutral']}</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 1.2rem;">👎</div>
-                    <div>{feedback_counts['negative']}</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
 
 # Main App Layout
 def main():
