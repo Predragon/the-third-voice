@@ -139,15 +139,24 @@ def render_sidebar():
         st.rerun()
 
     st.sidebar.markdown("---\n### 💾 Data Management")
-    uploaded = st.sidebar.file_uploader("📤 Load History", type="json")
+    uploaded = st.sidebar.file_uploader("📤 Load History", type="json", key="file_uploader")
     if uploaded:
         try:
             data = json.load(uploaded)
-            for key in ['contacts', 'journal_entries', 'feedback_data', 'user_stats']:
-                st.session_state[key] = data.get(key, st.session_state[key])
+            # Clear existing data to avoid conflicts
+            st.session_state.contacts = data.get('contacts', {'General': {'context': 'general', 'history': []}})
+            st.session_state.journal_entries = data.get('journal_entries', {})
+            st.session_state.feedback_data = data.get('feedback_data', {})
+            st.session_state.user_stats = data.get('user_stats', {'total_messages': 0, 'coached_messages': 0, 'translated_messages': 0})
+            # Ensure active_contact is valid
+            if st.session_state.active_contact not in st.session_state.contacts:
+                st.session_state.active_contact = "General"
             st.sidebar.success("✅ Data loaded!")
-        except:
-            st.sidebar.error("❌ Invalid file")
+            # Clear the file uploader to prevent re-processing
+            st.session_state['file_uploader'] = None
+            st.rerun()  # Force rerun to refresh UI with loaded data
+        except Exception as e:
+            st.sidebar.error(f"❌ Invalid file: {str(e)}")
 
     if st.sidebar.button("💾 Save All"):
         save_data = {
