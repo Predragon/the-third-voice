@@ -8,346 +8,20 @@ CONTEXTS = ["general", "romantic", "coparenting", "workplace", "family", "friend
 REQUIRE_TOKEN = False
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# Modern CSS Styles inspired by ChatGPT
+# CSS Styles (Simplified and cleaned for better experience)
 st.markdown("""
 <style>
-/* Global Styles */
-.stApp {
-    background: #f7f7f8;
-}
-
-/* Main container */
-.main-container {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 2rem 1rem;
-}
-
-/* Header */
-.app-header {
-    text-align: center;
-    margin-bottom: 3rem;
-}
-
-.app-title {
-    font-size: 2.5rem;
-    font-weight: 600;
-    color: #202123;
-    margin-bottom: 0.5rem;
-}
-
-.app-subtitle {
-    font-size: 1.1rem;
-    color: #6b7280;
-    margin-bottom: 2rem;
-}
-
-/* Contact selector */
-.contact-selector {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin-bottom: 2rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    border: 1px solid #e5e7eb;
-}
-
-.contact-title {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: #202123;
-    margin-bottom: 1rem;
-}
-
-/* Action buttons */
-.action-buttons {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 2rem;
-}
-
-.action-btn {
-    flex: 1;
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    padding: 1.5rem;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-decoration: none;
-    color: #202123;
-    font-weight: 500;
-}
-
-.action-btn:hover {
-    background: #f9fafb;
-    border-color: #d1d5db;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-
-.action-btn-primary {
-    background: #10a37f;
-    color: white;
-    border-color: #10a37f;
-}
-
-.action-btn-primary:hover {
-    background: #0d9369;
-    color: white;
-}
-
-/* Message containers */
-.message-container {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    border: 1px solid #e5e7eb;
-}
-
-.message-header {
-    font-weight: 600;
-    color: #202123;
-    margin-bottom: 1rem;
-    font-size: 1.1rem;
-}
-
-.user-message {
-    border-left: 4px solid #10a37f;
-    background: #f0fdf4;
-}
-
-.contact-message {
-    border-left: 4px solid #3b82f6;
-    background: #eff6ff;
-}
-
-.ai-response {
-    border-left: 4px solid #8b5cf6;
-    background: #f5f3ff;
-    margin-top: 1rem;
-}
-
-.ai-response .message-header {
-    color: #7c3aed;
-}
-
-/* Input areas */
-.stTextArea textarea {
-    border-radius: 8px;
-    border: 1px solid #e5e7eb;
-    background: white;
-    color: #202123;
-    font-size: 1rem;
-    padding: 1rem;
-}
-
-.stTextArea textarea:focus {
-    border-color: #10a37f;
-    box-shadow: 0 0 0 3px rgba(16,163,127,0.1);
-}
-
-/* Buttons */
-.stButton > button {
-    border-radius: 8px;
-    border: 1px solid #e5e7eb;
-    font-weight: 500;
-    padding: 0.5rem 1rem;
-    transition: all 0.2s;
-}
-
-.stButton > button:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.stButton > button[kind="primary"] {
-    background: #10a37f;
-    border-color: #10a37f;
-}
-
-.stButton > button[kind="primary"]:hover {
-    background: #0d9369;
-}
-
-/* Tabs */
-.stTabs [data-baseweb="tab-list"] {
-    background: white;
-    border-radius: 12px;
-    padding: 0.5rem;
-    margin-bottom: 1rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-.stTabs [data-baseweb="tab"] {
-    border-radius: 8px;
-    color: #6b7280;
-    font-weight: 500;
-}
-
-.stTabs [data-baseweb="tab"]:hover {
-    background: #f9fafb;
-}
-
-.stTabs [aria-selected="true"] {
-    background: #10a37f;
-    color: white;
-}
-
-/* History items */
-.history-item {
-    background: white;
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-    border: 1px solid #e5e7eb;
-}
-
-.history-timestamp {
-    color: #6b7280;
-    font-size: 0.9rem;
-    margin-bottom: 0.5rem;
-}
-
-.original-message {
-    background: #f9fafb;
-    padding: 0.75rem;
-    border-radius: 6px;
-    margin-bottom: 0.75rem;
-    border-left: 3px solid #e5e7eb;
-    color: #202123;
-}
-
-.improved-message {
-    background: #f0fdf4;
-    padding: 0.75rem;
-    border-radius: 6px;
-    border-left: 3px solid #10a37f;
-    color: #202123;
-}
-
-/* Journal sections */
-.journal-section {
-    background: white;
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-    border: 1px solid #e5e7eb;
-}
-
-.journal-section h4 {
-    color: #202123;
-    margin-bottom: 0.5rem;
-    font-weight: 600;
-}
-
-/* Stats cards */
-.stats-card {
-    background: white;
-    border-radius: 8px;
-    padding: 1.5rem;
-    text-align: center;
-    border: 1px solid #e5e7eb;
-    margin-bottom: 1rem;
-}
-
-.stats-number {
-    font-size: 2rem;
-    font-weight: 700;
-    color: #10a37f;
-    margin-bottom: 0.5rem;
-}
-
-.stats-label {
-    color: #6b7280;
-    font-size: 0.9rem;
-    font-weight: 500;
-}
-
-/* Feedback buttons */
-.feedback-container {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 1rem;
-}
-
-.feedback-btn {
-    flex: 1;
-    padding: 0.5rem;
-    border-radius: 6px;
-    border: 1px solid #e5e7eb;
-    background: white;
-    color: #202123;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.feedback-btn:hover {
-    background: #f9fafb;
-}
-
-/* Sidebar overrides */
-.css-1d391kg {
-    background: white;
-    border-right: 1px solid #e5e7eb;
-}
-
-.css-1d391kg .stSelectbox label {
-    color: #202123;
-    font-weight: 500;
-}
-
-.css-1d391kg .stTextInput label {
-    color: #202123;
-    font-weight: 500;
-}
-
-/* Remove default streamlit styling */
-.stApp > header {
-    background: transparent;
-}
-
-.stApp [data-testid="stHeader"] {
-    background: transparent;
-}
-
-/* Ensure all text is readable */
-.stMarkdown, .stText, p, span, div {
-    color: #202123 !important;
-}
-
-/* Fix sidebar text colors */
-.css-1d391kg .stMarkdown, .css-1d391kg .stText, .css-1d391kg p, .css-1d391kg span, .css-1d391kg div {
-    color: #202123 !important;
-}
-
-/* Success/Error messages */
-.stSuccess {
-    background: #f0fdf4;
-    border: 1px solid #bbf7d0;
-    color: #166534;
-}
-
-.stError {
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    color: #dc2626;
-}
-
-.stWarning {
-    background: #fffbeb;
-    border: 1px solid #fed7aa;
-    color: #d97706;
-}
-
-.stInfo {
-    background: #eff6ff;
-    border: 1px solid #bfdbfe;
-    color: #1d4ed8;
-}
+.contact-card {background:rgba(76,175,80,0.1);padding:0.8rem;border-radius:8px;border-left:4px solid #4CAF50;margin:0.5rem 0;cursor:pointer}
+.ai-response {background:rgba(76,175,80,0.1);padding:1rem;border-radius:8px;border-left:4px solid #4CAF50;margin:0.5rem 0}
+.user-msg {background:rgba(33,150,243,0.1);padding:0.8rem;border-radius:8px;border-left:4px solid #2196F3;margin:0.3rem 0}
+.contact-msg {background:rgba(255,193,7,0.1);padding:0.8rem;border-radius:8px;border-left:4px solid #FFC107;margin:0.3rem 0}
+.pos {background:rgba(76,175,80,0.2);padding:0.5rem;border-radius:5px;margin:0.2rem 0}
+.neg {background:rgba(244,67,54,0.2);padding:0.5rem;border-radius:5px;margin:0.2rem 0}
+.neu {background:rgba(33,150,243,0.2);padding:0.5rem;border-radius:5px;margin:0.2rem 0}
+.journal-section {background:rgba(156,39,176,0.1);padding:1rem;border-radius:8px;margin:0.5rem 0}
+.main-actions {display:flex;gap:1rem;margin:1rem 0}
+.main-actions button {flex:1;padding:0.8rem;font-size:1.1rem}
+.feedback-section {background:rgba(0,150,136,0.1);padding:1rem;border-radius:8px;margin:1rem 0}
 </style>
 """, unsafe_allow_html=True)
 
@@ -371,7 +45,7 @@ initialize_session()
 # Token Validation
 def validate_token():
     if REQUIRE_TOKEN and not st.session_state.token_validated:
-        st.markdown('<div class="app-header"><h1 class="app-title">🎙️ The Third Voice</h1><p class="app-subtitle">Your AI Communication Coach</p></div>', unsafe_allow_html=True)
+        st.markdown("# 🎙️ The Third Voice\n*Your AI Communication Coach*")
         st.warning("🔐 Access restricted. Enter beta token to continue.")
         token = st.text_input("Token:", type="password")
         if st.button("Validate"):
@@ -440,8 +114,7 @@ def get_ai_response(message, context, is_received=False):
 
 # Sidebar: Contact Management
 def render_sidebar():
-    st.sidebar.markdown('<div style="color: #202123; font-weight: 600; font-size: 1.1rem; margin-bottom: 1rem;">👥 Your Contacts</div>', unsafe_allow_html=True)
-    
+    st.sidebar.markdown("### 👥 Your Contacts")
     with st.sidebar.expander("➕ Add Contact"):
         new_name = st.text_input("Name:")
         new_context = st.selectbox("Relationship:", CONTEXTS)
@@ -457,15 +130,14 @@ def render_sidebar():
         st.session_state.active_contact = selected
 
     contact = st.session_state.contacts[st.session_state.active_contact]
-    st.sidebar.markdown(f'<div style="color: #202123;"><strong>Context:</strong> {contact["context"]}<br><strong>Messages:</strong> {len(contact["history"])}</div>', unsafe_allow_html=True)
+    st.sidebar.markdown(f"**Context:** {contact['context']}\n**Messages:** {len(contact['history'])}")
 
     if st.sidebar.button("🗑️ Delete Contact") and st.session_state.active_contact != "General":
         del st.session_state.contacts[st.session_state.active_contact]
         st.session_state.active_contact = "General"
         st.rerun()
 
-    st.sidebar.markdown('<div style="border-top: 1px solid #e5e7eb; margin: 1rem 0; padding-top: 1rem;"><div style="color: #202123; font-weight: 600; margin-bottom: 1rem;">💾 Data Management</div></div>', unsafe_allow_html=True)
-    
+    st.sidebar.markdown("---\n### 💾 Data Management")
     uploaded = st.sidebar.file_uploader("📤 Load History", type="json", key="file_uploader")
     if uploaded:
         try:
@@ -473,7 +145,6 @@ def render_sidebar():
             st.session_state.contacts = data.get('contacts', {'General': {'context': 'general', 'history': []}})
             st.session_state.journal_entries = data.get('journal_entries', {})
             st.session_state.feedback_data = data.get('feedback_data', {})
-            st.session_state.user_stats = data.get('user_stats', {'total_messages': 0, 'coached_messages': 0, 'translated_messages': 0})
             if st.session_state.active_contact not in st.session_state.contacts:
                 st.session_state.active_contact = "General"
             st.sidebar.success("✅ Data loaded!")
@@ -487,7 +158,6 @@ def render_sidebar():
             'contacts': st.session_state.contacts,
             'journal_entries': st.session_state.journal_entries,
             'feedback_data': st.session_state.feedback_data,
-            'user_stats': st.session_state.user_stats,
             'saved_at': datetime.datetime.now().isoformat()
         }
         filename = f"third_voice_{datetime.datetime.now().strftime('%m%d_%H%M')}.json"
@@ -497,13 +167,15 @@ render_sidebar()
 
 # Main UI
 def render_main():
-    # Header
-    st.markdown('<div class="app-header"><h1 class="app-title">🎙️ The Third Voice</h1><p class="app-subtitle">Your AI Communication Coach</p><div style="color: #6b7280; font-style: italic;">Created by Predrag Mirković</div></div>', unsafe_allow_html=True)
-    
-    # Contact selector
-    st.markdown(f'<div class="contact-selector"><div class="contact-title">💬 Communicating with: {st.session_state.active_contact}</div></div>', unsafe_allow_html=True)
-    
-    # Action buttons
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        try:
+            st.image("logo.svg")
+        except:
+            st.markdown("# 🎙️ The Third Voice")
+        st.markdown("<div style='text-align: center'><i>Created by Predrag Mirković</i></div>", unsafe_allow_html=True)
+
+    st.markdown(f"### 💬 Communicating with: **{st.session_state.active_contact}**")
     col1, col2 = st.columns(2)
     with col1:
         if st.button("📤 Coach My Message", type="primary", use_container_width=True):
@@ -526,20 +198,17 @@ def render_message_input():
         st.session_state.active_mode = None
         st.rerun()
 
-    # Message input container
-    container_class = "user-message" if mode == "coach" else "contact-message"
-    header_text = "📤 Your message to send:" if mode == "coach" else "📥 Message you received:"
-    
-    st.markdown(f'<div class="message-container {container_class}"><div class="message-header">{header_text}</div></div>', unsafe_allow_html=True)
+    input_class = "user-msg" if mode == "coach" else "contact-msg"
+    st.markdown(f'<div class="{input_class}"><strong>{"📤 Your message to send:" if mode == "coach" else "📥 Message you received:"}</strong></div>', unsafe_allow_html=True)
 
     message = st.text_area("", height=120, key=f"{mode}_input", label_visibility="collapsed",
                            placeholder="Type your message here..." if mode == "coach" else "Paste their message here...")
 
     col1, col2 = st.columns([3, 1])
     with col1:
-        process_btn = st.button(f"{'🚀 Improve My Message' if mode == 'coach' else '🔍 Analyze & Respond'}", type="primary")
+        process_btn = st.button(f"{'🚀 Improve My Message' if mode == 'coach' else '🔍 Analyze & Respond'}", type="secondary")
     with col2:
-        if st.button("Clear"):
+        if st.button("Clear", type="secondary"):
             st.session_state[f"{mode}_input"] = ""
             st.rerun()
 
@@ -549,11 +218,12 @@ def render_message_input():
             result = get_ai_response(message, contact['context'], mode == "translate")
 
             if "error" not in result:
+                st.markdown("### 🎙️ The Third Voice says:")
                 if mode == "coach":
-                    st.markdown(f'<div class="message-container ai-response"><div class="message-header">✨ Your improved message:</div><div style="color: #202123; line-height: 1.6;">{result["improved"]}</div><div style="color: #6b7280; font-size: 0.9rem; margin-top: 1rem; font-style: italic;">Generated by: {result["model"]}</div></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="ai-response"><strong>✨ Your improved message:</strong><br><br>{result["improved"]}<br><br><small><i>Generated by: {result["model"]}</i></small></div>', unsafe_allow_html=True)
                     st.session_state.user_stats['coached_messages'] += 1
                 else:
-                    st.markdown(f'<div class="message-container ai-response"><div class="message-header">🔍 What they really mean:</div><div style="color: #202123; line-height: 1.6;">{result["response"]}</div><div style="color: #6b7280; font-size: 0.9rem; margin-top: 1rem; font-style: italic;">Generated by: {result["model"]}</div></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="ai-response"><strong>🔍 What they really mean:</strong><br>{result["response"]}<br><br><small><i> Generated by: {result["model"]}</i></small></div>', unsafe_allow_html=True)
                     st.session_state.user_stats['translated_messages'] += 1
 
                 history_entry = {
@@ -569,7 +239,7 @@ def render_message_input():
                 contact['history'].append(history_entry)
                 st.session_state.user_stats['total_messages'] += 1
 
-                st.markdown('<div class="message-container"><div class="message-header">📊 Was this helpful?</div></div>', unsafe_allow_html=True)
+                st.markdown("### 📊 Was this helpful?")
                 col1, col2, col3 = st.columns(3)
                 for idx, (label, emoji) in enumerate([("👍 Yes", "positive"), ("👌 Okay", "neutral"), ("👎 No", "negative")]):
                     with [col1, col2, col3][idx]:
@@ -585,14 +255,13 @@ def render_message_input():
 
 render_message_input()
 
-# Tabs (removed tab 3 as requested)
+# Tabs (Removed Stats tab)
 def render_tabs():
-    tab1, tab2, tab3 = st.tabs(["📜 History", "📘 Journal", "ℹ️ About"])
+    tab1, tab2, tab4 = st.tabs(["📜 History", "📘 Journal", "ℹ️ About"])
 
     with tab1:
-        st.markdown(f'<div style="color: #202123; font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem;">📜 History with {st.session_state.active_contact}</div>', unsafe_allow_html=True)
+        st.markdown(f"### 📜 History with {st.session_state.active_contact}")
         contact = st.session_state.contacts[st.session_state.active_contact]
-        
         if not contact['history']:
             st.info(f"No messages yet with {st.session_state.active_contact}. Use the buttons above to get started!")
         else:
@@ -606,20 +275,18 @@ def render_tabs():
             for entry in reversed(filtered_history):
                 with st.expander(f"**{entry['time']}** • {entry['type'].title()} • {entry['original'][:50]}..."):
                     if entry['type'] == 'coach':
-                        st.markdown(f'<div class="original-message"><strong>📤 Original:</strong> {entry["original"]}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="improved-message"><strong>🎙️ Improved:</strong> {entry["result"]}<br><small style="color: #6b7280; font-style: italic;">by {entry.get("model", "Unknown")}</small></div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="user-msg">📤 <strong>Original:</strong> {entry["original"]}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="ai-response">🎙️ <strong>Improved:</strong> {entry["result"]}<br><small><i>by {entry.get("model", "Unknown")}</i></small></div>', unsafe_allow_html=True)
                     else:
-                        st.markdown(f'<div class="original-message"><strong>📥 They said:</strong> {entry["original"]}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="improved-message"><strong>🎙️ Analysis:</strong> {entry["result"]}<br><small style="color: #6b7280; font-style: italic;">by {entry.get("model", "Unknown")}</small></div>', unsafe_allow_html=True)
-                    
+                        st.markdown(f'<div class="contact-msg">📥 <strong>They said:</strong> {entry["original"]}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="ai-response">🎙️ <strong>Analysis:</strong> {entry["result"]}<br><small><i>by {entry.get("model", "Unknown")}</i></small></div>', unsafe_allow_html=True)
                     if entry.get('id') in st.session_state.feedback_data:
                         feedback = st.session_state.feedback_data[entry['id']]
                         emoji = {"positive": "👍", "neutral": "👌", "negative": "👎"}
                         st.markdown(f"*Your feedback: {emoji.get(feedback, '❓')}*")
 
     with tab2:
-        st.markdown(f'<div style="color: #202123; font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem;">📘 Communication Journal - {st.session_state.active_contact}</div>', unsafe_allow_html=True)
-        
+        st.markdown(f"### 📘 Communication Journal - {st.session_state.active_contact}")
         contact_key = st.session_state.active_contact
         st.session_state.journal_entries.setdefault(contact_key, {
             'what_worked': '', 'what_didnt': '', 'insights': '', 'patterns': ''
@@ -629,47 +296,45 @@ def render_tabs():
         col1, col2 = st.columns(2)
 
         with col1:
-            st.markdown('<div class="journal-section"><h4>💚 What worked well?</h4></div>', unsafe_allow_html=True)
-            journal['what_worked'] = st.text_area("", value=journal['what_worked'], key=f"worked_{contact_key}", height=100, placeholder="Communication strategies that were successful...", label_visibility="collapsed")
-            
-            st.markdown('<div class="journal-section"><h4>🔍 Key insights?</h4></div>', unsafe_allow_html=True)
-            journal['insights'] = st.text_area("", value=journal['insights'], key=f"insights_{contact_key}", height=100, placeholder="Important realizations about this relationship...", label_visibility="collapsed")
+            st.markdown('<div class="journal-section">**💚 What worked well?**</div>', unsafe_allow_html=True)
+            journal['what_worked'] = st.text_area("", value=journal['what_worked'], key=f"worked_{contact_key}", height=100, placeholder="Communication strategies that were successful...")
+            st.markdown('<div class="journal-section">**🔍 Key insights?**</div>', unsafe_allow_html=True)
+            journal['insights'] = st.text_area("", value=journal['insights'], key=f"insights_{contact_key}", height=100, placeholder="Important realizations about this relationship...")
 
         with col2:
-            st.markdown('<div class="journal-section"><h4>⚠️ What didn\'t work?</h4></div>', unsafe_allow_html=True)
-            journal['what_didnt'] = st.text_area("", value=journal['what_didnt'], key=f"didnt_{contact_key}", height=100, placeholder="What caused issues or misunderstandings...", label_visibility="collapsed")
-            
-            st.markdown('<div class="journal-section"><h4>📊 Patterns noticed?</h4></div>', unsafe_allow_html=True)
-            journal['patterns'] = st.text_area("", value=journal['patterns'], key=f"patterns_{contact_key}", height=100, placeholder="Communication patterns you've observed...", label_visibility="collapsed")
+            st.markdown('<div class="journal-section">**⚠️ What didn’t work?**</div>', unsafe_allow_html=True)
+            journal['what_didnt'] = st.text_area("", value=journal['what_didnt'], key=f"didnt_{contact_key}", height=100, placeholder="What caused issues or misunderstandings...")
+            st.markdown('<div class="journal-section">**📊 Patterns noticed?**</div>', unsafe_allow_html=True)
+            journal['patterns'] = st.text_area("", value=journal['patterns'], key=f"patterns_{contact_key}", height=100, placeholder="Communication patterns you've observed...")
 
-    with tab3:
+    with tab4:
         st.markdown("""
-        <div style="color: #202123;">
-        <h3>ℹ️ About The Third Voice</h3>
-        <p><strong>The communication coach that's there when you need it most.</strong></p>
-        <p>Instead of repairing relationships after miscommunication damage, The Third Voice helps you communicate better in real-time.</p>
-        
-        <h4>🎯 How it works:</h4>
-        <ol>
-        <li><strong>Select your contact</strong> - Each relationship gets personalized coaching</li>
-        <li><strong>Coach your messages</strong> - Improve what you're about to send</li>
-        <li><strong>Understand their messages</strong> - Decode the real meaning behind their words</li>
-        <li><strong>Build better patterns</strong> - Journal and learn from each interaction</li>
-        </ol>
-        
-        <h4>✨ Key Features:</h4>
-        <ul>
-        <li>🎯 Context-aware coaching for different relationships</li>
-        <li>📊 Track your communication progress</li>
-        <li>📘 Personal journal for insights</li>
-        <li>💾 Export/import your data</li>
-        <li>🔒 Privacy-first design</li>
-        </ul>
-        
-        <p><strong>Privacy First:</strong> All data stays on your device. Save and load your own files.</p>
-        <p><strong>Beta v1.0.0</strong> — Built with ❤️ to heal relationships through better communication.</p>
-        <p><em>"When both people are talking from pain, someone needs to be the third voice."</em></p>
-        </div>
-        """, unsafe_allow_html=True)
+        ### ℹ️ About The Third Voice
+        **The communication coach that's there when you need it most.**
+        Instead of repairing relationships after miscommunication damage, The Third Voice helps you communicate better in real-time.
+        **How it works:**
+        1. **Select your contact** - Each relationship gets personalized coaching
+        2. **Coach your messages** - Improve what you're about to send
+        3. **Understand their messages** - Decode the real meaning behind their words
+        4. **Build better patterns** - Journal and learn from each interaction
+        **Key Features:**
+        - 🎯 Context-aware coaching for different relationships
+        - 📊 Track your communication progress
+        - 📘 Personal journal for insights
+        - 💾 Export/import your data
+        - 🔒 Privacy-first design
+        **Privacy First:** All data stays on your device. Save and load your own files.
+        **Beta v1.0.0** — Built with ❤️ to heal relationships through better communication.
+        *"When both people are talking from pain, someone needs to be the third voice."*
+        ---
+        **Support & Community:**
+        - 💬 Join discussions at our community forum
+        - 📧 Report bugs or suggest features
+        - 🌟 Share your success stories
+        **Technical Details:**
+        - Powered by OpenRouter API
+        - Uses multiple AI models for reliability
+        - Built with Streamlit for easy deployment
+        """)
 
 render_tabs()
