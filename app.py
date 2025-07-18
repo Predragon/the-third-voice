@@ -317,27 +317,27 @@ def render_tabs():
                         emoji = {"positive": "👍", "neutral": "👌", "negative": "👎"}
                         st.markdown(f"*Your feedback: {emoji.get(feedback, '❓')}*")
 
-with tab2:
-    st.markdown(f"### 📘 Communication Journal - {st.session_state.active_contact}")
-    contact_key = st.session_state.active_contact
-    st.session_state.journal_entries.setdefault(contact_key, {
-        'what_worked': '', 'what_didnt': '', 'insights': '', 'patterns': ''
-    })
+    with tab2:
+        st.markdown(f"### 📘 Communication Journal - {st.session_state.active_contact}")
+        contact_key = st.session_state.active_contact
+        st.session_state.journal_entries.setdefault(contact_key, {
+            'what_worked': '', 'what_didnt': '', 'insights': '', 'patterns': ''
+        })
 
-    journal = st.session_state.journal_entries[contact_key]
-    col1, col2 = st.columns(2)
+        journal = st.session_state.journal_entries[contact_key]
+        col1, col2 = st.columns(2)
 
-    with col1:
-        st.markdown('<div class="journal-section">**💚 What worked well?**</div>', unsafe_allow_html=True)
-        journal['what_worked'] = st.text_area("", value=journal['what_worked'], key=f"worked_{contact_key}", height=100, placeholder="Communication strategies that were successful...")
-        st.markdown('<div class="journal-section">**🔍 Key insights?**</div>', unsafe_allow_html=True)
-        journal['insights'] = st.text_area("", value=journal['insights'], key=f"insights_{contact_key}", height=100, placeholder="Important realizations about this relationship...")
+        with col1:
+            st.markdown('<div class="journal-section">**💚 What worked well?**</div>', unsafe_allow_html=True)
+            journal['what_worked'] = st.text_area("", value=journal['what_worked'], key=f"worked_{contact_key}", height=100, placeholder="Communication strategies that were successful...")
+            st.markdown('<div class="journal-section">**🔍 Key insights?**</div>', unsafe_allow_html=True)
+            journal['insights'] = st.text_area("", value=journal['insights'], key=f"insights_{contact_key}", height=100, placeholder="Important realizations about this relationship...")
 
-    with col2:
-        st.markdown('<div class="journal-section">**⚠️ What didn\'t work?**</div>', unsafe_allow_html=True)  # Fixed line
-        journal['what_didnt'] = st.text_area("", value=journal['what_didnt'], key=f"didnt_{contact_key}", height=100, placeholder="What caused issues or misunderstandings...")
-        st.markdown('<div class="journal-section">**📊 Patterns noticed?**</div>', unsafe_allow_html=True)
-        journal['patterns'] = st.text_area("", value=journal['patterns'], key=f"patterns_{contact_key}", height=100, placeholder="Communication patterns you've observed...")
+        with col2:
+            st.markdown('<div class="journal-section">**⚠️ What didn\'t work?**</div>', unsafe_allow_html=True)
+            journal['what_didnt'] = st.text_area("", value=journal['what_didnt'], key=f"didnt_{contact_key}", height=100, placeholder="What caused issues or misunderstandings...")
+            st.markdown('<div class="journal-section">**📊 Patterns noticed?**</div>', unsafe_allow_html=True)
+            journal['patterns'] = st.text_area("", value=journal['patterns'], key=f"patterns_{contact_key}", height=100, placeholder="Communication patterns you've observed...")
     
     with tab3:
         st.markdown("### 📊 Your Communication Stats")
@@ -396,4 +396,27 @@ with tab2:
         - Built with Streamlit for easy deployment
         """)
 
-# ================
+# ========================
+# MAIN APP EXECUTION
+# ========================
+def main():
+    st.set_page_config(
+        page_title="The Third Voice",
+        page_icon="🎙️",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    
+    initialize_session()
+    validate_token()
+    
+    render_sidebar()
+    render_main()
+    
+    if st.session_state.active_mode:
+        render_message_input()
+    else:
+        render_tabs()
+
+if __name__ == "__main__":
+    main()
