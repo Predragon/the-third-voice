@@ -1,0 +1,48 @@
+<svg viewBox="0 0 400 120" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gradient3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#9C27B0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#673AB7;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Sound Wave Pattern -->
+  <g stroke="#9C27B0" stroke-width="2" fill="none" opacity="0.4">
+    <!-- Sound waves emanating from "3" -->
+    <path d="M 20 56 Q 30 46 40 56 Q 50 66 60 56 Q 70 46 80 56 Q 90 66 100 56 Q 110 46 120 56"/>
+    <path d="M 25 46 Q 35 36 45 46 Q 55 56 65 46 Q 75 36 85 46 Q 95 56 105 46 Q 115 36 125 46"/>
+    <path d="M 25 66 Q 35 76 45 66 Q 55 56 65 66 Q 75 76 85 66 Q 95 56 105 66 Q 115 76 125 66"/>
+  </g>
+  
+  <!-- AI Nodes integrated with sound waves -->
+  <circle cx="40" cy="56" r="2" fill="#9C27B0" opacity="0.7"/>
+  <circle cx="65" cy="46" r="2" fill="#9C27B0" opacity="0.7"/>
+  <circle cx="85" cy="66" r="2" fill="#9C27B0" opacity="0.7"/>
+  <circle cx="105" cy="46" r="2" fill="#9C27B0" opacity="0.7"/>
+  
+  <!-- Connection lines between nodes -->
+  <line x1="40" y1="56" x2="65" y2="46" stroke="#9C27B0" stroke-width="1" opacity="0.5"/>
+  <line x1="65" y1="46" x2="85" y2="66" stroke="#9C27B0" stroke-width="1" opacity="0.5"/>
+  <line x1="85" y1="66" x2="105" y2="46" stroke="#9C27B0" stroke-width="1" opacity="0.5"/>
+  
+  <!-- Modern Number "3" with sound wave integration -->
+  <text x="30" y="70" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="url(#gradient3)">3</text>
+  
+  <!-- Sound wave bars integrated into the "3" -->
+  <rect x="52" y="40" width="2" height="8" fill="#9C27B0" opacity="0.6"/>
+  <rect x="56" y="35" width="2" height="18" fill="#9C27B0" opacity="0.6"/>
+  <rect x="60" y="38" width="2" height="12" fill="#9C27B0" opacity="0.6"/>
+  <rect x="64" y="42" width="2" height="6" fill="#9C27B0" opacity="0.6"/>
+  
+  <rect x="52" y="65" width="2" height="10" fill="#9C27B0" opacity="0.6"/>
+  <rect x="56" y="62" width="2" height="16" fill="#9C27B0" opacity="0.6"/>
+  <rect x="60" y="67" width="2" height="8" fill="#9C27B0" opacity="0.6"/>
+  <rect x="64" y="70" width="2" height="4" fill="#9C27B0" opacity="0.6"/>
+  
+  <!-- "The Third Voice" Text -->
+  <text x="150" y="45" font-family="Arial, sans-serif" font-size="24" font-weight="300" fill="#2C3E50">The Third</text>
+  <text x="150" y="70" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#9C27B0">Voice</text>
+  
+  <!-- Tagline -->
+  <text x="150" y="88" font-family="Arial, sans-serif" font-size="12" fill="#7F8C8D" opacity="0.8">AI Communication Coach</text>
+</svg>
