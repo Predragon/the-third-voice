@@ -1,5 +1,3 @@
-from thirdvoice.coaching_engine import process_message
-from thirdvoice.prompts.default import PROMPTS
 import streamlit as st
 import json
 import datetime
@@ -216,7 +214,7 @@ def render_message_input():
     if process_btn and message.strip():
         with st.spinner("🎙️ The Third Voice is analyzing..."):
             contact = st.session_state.contacts[st.session_state.active_contact]
-            result = process_message(message, contact['context'], mode == "translate")
+            result = get_ai_response(message, contact['context'], mode == "translate")
 
             if "error" not in result:
                 st.markdown("### 🎙️ The Third Voice says:")

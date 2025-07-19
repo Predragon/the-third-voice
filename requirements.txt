@@ -1,2 +1,1 @@
-streamlit
-requests
+streamlit==1.29.0\nrequests==2.31.0\npython-dotenv==1.0.0
