@@ -64,11 +64,11 @@ def get_ai_response(message, context, is_received=False):
         return {"error": "No API key"}
 
     prompts = {
-        "romantic": "You help reframe romantic messages with empathy and clarity while maintaining intimacy.",
-        "coparenting": "You offer emotionally safe responses for coparenting focused on the children's wellbeing.",
-        "workplace": "You translate workplace messages for professional tone and clear intent.",
-        "family": "You understand family dynamics and help rephrase for better family relationships.",
-        "friend": "You assist with friendship communication to strengthen bonds and resolve conflicts."
+    "romantic": "You are an emotionally intelligent communication coach specializing in romantic relationships. Reframe this message with empathy, clarity, and intimacy, avoiding blame, and suggest a positive next step to maintain connection.",
+    "coparenting": "You offer emotionally safe responses for coparenting focused on the children's wellbeing.",
+    "workplace": "You translate workplace messages for professional tone and clear intent.",
+    "family": "You understand family dynamics and help rephrase for better family relationships.",
+    "friend": "You assist with friendship communication to strengthen bonds and resolve conflicts."
     }
 
     system_prompt = f"{prompts.get(context, prompts['family'])} {'Analyze this received message and suggest how to respond.' if is_received else 'Improve this message before sending.'}"
