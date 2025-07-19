@@ -4,26 +4,51 @@ Keeping track of the user's journey and data
 """
 
 import streamlit as st
-from .config import REQUIRE_TOKEN
+from .config import REQUIRE_TOKEN, CONTEXTS  # Ensure CONTEXTS is defined
+
+def get_default_contact_name(context: str) -> str:
+    """Get a friendly default name for each context."""
+    context_names = {
+        'general': 'General',
+        'romantic': 'My Partner ❤️',
+        'coparenting': 'Co-Parent 👨‍👩‍👧',
+        'workplace': 'Work Contact 💼',
+        'family': 'Family Member 👨‍👩‍👧‍👦',
+        'friend': 'Friend 👯'
+    }
+    return context_names.get(context, context.title())
 
 def initialize_session_state():
     """Initialize all session state variables with defaults"""
+    # Generate default contacts and journals from CONTEXTS
+    default_contacts = {}
+    default_journals = {}
     
-    # Default session state values
+    # Fallback to ['general'] if CONTEXTS is undefined
+    contexts = CONTEXTS if 'CONTEXTS' in globals() else ['general']
+    
+    for context in contexts:
+        contact_name = get_default_contact_name(context)
+        default_contacts[contact_name] = {
+            'context': context,
+            'history': []
+        }
+        default_journals[contact_name] = {
+            'what_worked': '',
+            'what_didnt': '',
+            'insights': '',
+            'patterns': ''
+        }
+    
     defaults = {
         # Authentication
         'token_validated': not REQUIRE_TOKEN,
         'api_key': st.secrets.get("OPENROUTER_API_KEY", ""),
         
         # Core data structures
-        'contacts': {
-            'General': {
-                'context': 'general',
-                'history': []
-            }
-        },
-        'active_contact': 'General',
-        'journal_entries': {},
+        'contacts': default_contacts,
+        'active_contact': get_default_contact_name('romantic'),  # Changed to My Partner ❤️
+        'journal_entries': default_journals,
         'feedback_data': {},
         
         # User statistics
@@ -66,6 +91,12 @@ def add_contact(name: str, context: str) -> bool:
         'context': context,
         'history': []
     }
+    st.session_state.journal_entries[name] = {
+        'what_worked': '',
+        'what_didnt': '',
+        'insights': '',
+        'patterns': ''
+    }
     st.session_state.active_contact = name
     return True
 
@@ -83,10 +114,12 @@ def delete_contact(name: str) -> bool:
         return False
     
     del st.session_state.contacts[name]
+    if name in st.session_state.journal_entries:
+        del st.session_state.journal_entries[name]
     
     # Switch to General if we deleted the active contact
     if st.session_state.active_contact == name:
-        st.session_state.active_contact = "General"
+        st.session_state.active_contact = get_default_contact_name('general')
     
     return True
 
@@ -151,7 +184,7 @@ def get_feedback_stats() -> dict:
     """
     feedback_counts = {
         'positive': 0,
-        'neutral': 0,  
+        'neutral': 0,
         'negative': 0
     }
     
@@ -164,8 +197,9 @@ def get_feedback_stats() -> dict:
 def clear_session_data():
     """Clear all session data (for fresh start)"""
     keys_to_clear = [
-        'contacts', 'active_contact', 'journal_entries', 
-        'feedback_data', 'user_stats', 'active_mode'
+        'contacts', 'active_contact', 'journal_entries',
+        'feedback_data', 'user_stats', 'active_mode',
+        'show_advanced', 'last_save_time'
     ]
     
     for key in keys_to_clear:
@@ -210,8 +244,14 @@ def import_session_data(data: dict) -> bool:
             return False
         
         # Import the data
-        st.session_state.contacts = data.get('contacts', {'General': {'context': 'general', 'history': []}})
-        st.session_state.journal_entries = data.get('journal_entries', {})
+        st.session_state.contacts = data.get('contacts', {
+            get_default_contact_name('general'): {'context': 'general', 'history': []}
+        })
+        st.session_state.journal_entries = data.get('journal_entries', {
+            get_default_contact_name('general'): {
+                'what_worked': '', 'what_didnt': '', 'insights': '', 'patterns': ''
+            }
+        })
         st.session_state.feedback_data = data.get('feedback_data', {})
         st.session_state.user_stats = data.get('user_stats', {
             'total_messages': 0,
@@ -221,7 +261,7 @@ def import_session_data(data: dict) -> bool:
         
         # Ensure active contact is valid
         if st.session_state.active_contact not in st.session_state.contacts:
-            st.session_state.active_contact = "General"
+            st.session_state.active_contact = get_default_contact_name('romantic')  # Changed to My Partner ❤️
         
         return True
         
