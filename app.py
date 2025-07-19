@@ -4,7 +4,7 @@ import datetime
 import requests
 
 # Constants
-CONTEXTS = ["general", "romantic", "coparenting", "workplace", "family", "friend"]
+CONTEXTS = ["romantic", "coparenting", "workplace", "family", "friend"]
 REQUIRE_TOKEN = False
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
