@@ -122,3 +122,35 @@ def get_api_key():
 def apply_styles():
     """Apply CSS styles to the app"""
     st.markdown(CSS_STYLES, unsafe_allow_html=True)
+
+# Add to your existing config.py
+def toggle_theme(theme_name):
+    """Switch between light/dark themes"""
+    st.session_state.current_theme = theme_name
+    apply_styles()  # Re-apply styles with new theme
+
+def apply_styles():
+    """Apply theme-specific CSS"""
+    theme = st.session_state.get('current_theme', 'light')
+    
+    dark_css = """
+    <style>
+        :root {
+            --primary: #1a1a1a;
+            --background: #0e1117;
+            --text: #f0f0f0;
+        }
+    </style>
+    """
+    
+    light_css = """
+    <style>
+        :root {
+            --primary: #ff4b4b;
+            --background: #ffffff;
+            --text: #31333f;
+        }
+    </style>
+    """
+    
+    st.markdown(dark_css if theme == 'dark' else light_css, unsafe_allow_html=True)
