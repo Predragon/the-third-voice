@@ -11,6 +11,22 @@ import json
 import datetime
 from typing import Optional
 
+# Add to your existing imports
+from modules.config import apply_styles, toggle_theme
+
+# Voice Command Detector (Add to your main message processing loop)
+if 'user_input' in st.session_state:
+    user_msg = st.session_state.user_input.lower()
+    
+    # Theme commands
+    if any(phrase in user_msg for phrase in ["dark theme", "dark mode"]):
+        toggle_theme('dark')
+        st.rerun()  # Refresh to apply changes
+        
+    elif any(phrase in user_msg for phrase in ["light theme", "light mode"]):
+        toggle_theme('light')
+        st.rerun()
+
 # Import our modular components
 from modules.config import apply_styles, REQUIRE_TOKEN, VALID_TOKENS, CONTEXTS
 from modules.session_state import (
