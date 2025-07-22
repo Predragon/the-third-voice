@@ -375,7 +375,18 @@ The situation:"""
                     }
                 )
                 
-                reply = res.json()["choices"][0]["message"]["content"]
+                # Check if the request was successful
+                res.raise_for_status()  # Raises an HTTPError for bad responses (4xx, 5xx)
+                
+                response_data = res.json()
+                # Debug: Log the response to inspect its structure
+                # st.write(response_data)  # Uncomment for debugging
+                
+                # Verify 'choices' exists in the response
+                if "choices" not in response_data:
+                    raise ValueError(f"Unexpected API response: 'choices' key missing. Response: {response_data}")
+                
+                reply = response_data["choices"][0]["message"]["content"]
                 
                 # Calculate healing score based on response quality
                 healing_score = min(10, len(reply.split()) // 10 + 5)
@@ -425,6 +436,11 @@ The situation:"""
                         time.sleep(2)
                         st.rerun()
                 
+            except requests.exceptions.HTTPError as http_err:
+                st.error(f"💔 API request failed: {http_err}")
+                st.markdown(f"*Status code: {res.status_code}, Response: {res.text}*")
+            except ValueError as ve:
+                st.error(f"💔 API response error: {ve}")
             except Exception as e:
                 st.error(f"💔 Something went wrong: {e}")
                 st.markdown("*Don't worry - even in technical difficulties, you're not alone. Try again.*")
