@@ -100,8 +100,7 @@ def initialize_session():
         "page": "contacts", 
         "active_contact": None, 
         "current_emotional_state": "calm", 
-        "user_input": "",
-        "clear_input": False  # Add this flag
+        "user_input": ""
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -163,12 +162,19 @@ def process_message(contact_name, message, context):
             # Save to database
             save_message(contact_name, mode, message, response, current_emotion, healing_score)
             
-            # Set flag to clear input on next rerun
-            st.session_state.clear_input = True
-            
-            st.success(f"🌟 Guidance:\n{response}")
-            if healing_score >= 8:
-                st.balloons()
+            # Create a persistent container for the AI response
+            response_container = st.container()
+            with response_container:
+                st.success(f"🌟 **AI Guidance:**\n\n{response}")
+                if healing_score >= 8:
+                    st.balloons()
+                    
+            # Store the response in session state to persist across reruns
+            st.session_state[f"last_response_{contact_name}"] = {
+                "response": response,
+                "healing_score": healing_score,
+                "timestamp": datetime.datetime.now().timestamp()
+            }
                 
         except Exception as e:
             st.error(f"Failed to process message: {e}")
@@ -234,27 +240,22 @@ def render_contact_list():
     if st.session_state.page != "contacts":
         return
         
-    st.markdown(f"### 🎙️ The Third Voice ({len(st.session_state.contacts)} contacts)")
+    st.markdown("### 🎙️ The Third Voice")
     
-    # Show existing contacts
+    # Show existing contacts - merge name with button
     for name, data in sorted(st.session_state.contacts.items(), key=lambda x: x[1]["history"][-1]["time"] if x[1]["history"] else x[1]["created_at"], reverse=True):
         context = CONTEXTS.get(data["context"], CONTEXTS["family"])
         last_msg = data["history"][-1] if data["history"] else None
         preview = f"{last_msg['original'][:30]}..." if last_msg else "Start chatting!"
         time = last_msg["time"] if last_msg else "New"
         
-        with st.container():
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.write(f"{context['icon']} **{name}** - {context['description']}\n\n{preview}")
-            with col2:
-                st.write(time)
-            
-            # Use contact name on button instead of "Chat"
-            if st.button(name, key=f"contact_{name}", use_container_width=True):
-                st.session_state.active_contact = name
-                st.session_state.page = "conversation"
-                st.rerun()
+        # Merge contact info into the button itself
+        button_text = f"{context['icon']} {name}\n{context['description']} • {time}\n{preview}"
+        
+        if st.button(button_text, key=f"contact_{name}", use_container_width=True):
+            st.session_state.active_contact = name
+            st.session_state.page = "conversation"
+            st.rerun()
     
     # Add new contact button
     st.markdown("---")
@@ -262,7 +263,7 @@ def render_contact_list():
         st.session_state.page = "add_contact"
         st.rerun()
 
-# Conversation screen (fixed input clearing issue)
+# Conversation screen (simplified - removed emotional state selection)
 def render_conversation():
     if st.session_state.page != "conversation" or not st.session_state.active_contact:
         return
@@ -301,34 +302,42 @@ def render_conversation():
     else:
         st.info("No chat history yet. Start a conversation below!")
     
-    # Handle input clearing
-    input_value = ""
-    if st.session_state.clear_input:
-        st.session_state.clear_input = False
-        input_value = ""
+    # Show last AI response if it exists (to prevent disappearing)
+    last_response_key = f"last_response_{contact_name}"
+    if last_response_key in st.session_state:
+        last_resp = st.session_state[last_response_key]
+        # Only show if it's recent (within last 30 seconds to avoid stale responses)
+        if datetime.datetime.now().timestamp() - last_resp["timestamp"] < 30:
+            with st.container():
+                st.success(f"🌟 **AI Guidance:**\n\n{last_resp['response']}")
+                if last_resp["healing_score"] >= 8:
+                    st.info("✨ High healing score achieved!")
     
-    # Input area with form to handle submission properly
-    with st.form("message_form", clear_on_submit=True):
-        user_input = st.text_area(
-            "What's happening?", 
-            value=input_value,
-            placeholder="Share their message or your response...", 
-            height=120
-        )
-        
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            transform_submitted = st.form_submit_button("✨ Transform", use_container_width=True)
-        with col2:
-            clear_submitted = st.form_submit_button("🗑️ Clear", use_container_width=True)
+    # Input area (removed emotional state selection for less friction)
+    user_input = st.text_area(
+        "What's happening?", 
+        key="conversation_input", 
+        placeholder="Share their message or your response...", 
+        height=120
+    )
     
-    # Handle form submissions
-    if transform_submitted and user_input.strip():
-        process_message(contact_name, user_input, context)
-        st.rerun()
-    
-    if clear_submitted:
-        st.rerun()
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        if st.button("✨ Transform", key="transform_message", 
+                    disabled=not user_input.strip(), use_container_width=True):
+            # Clear the previous response before processing new one
+            last_response_key = f"last_response_{contact_name}"
+            if last_response_key in st.session_state:
+                del st.session_state[last_response_key]
+            
+            process_message(contact_name, user_input, context)
+            # Clear input after processing
+            st.session_state.conversation_input = ""
+            st.rerun()
+    with col2:
+        if st.button("🗑️ Clear", key="clear_input", use_container_width=True):
+            st.session_state.conversation_input = ""
+            st.rerun()
 
 # Add contact page
 def render_add_contact():
