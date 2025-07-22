@@ -3,11 +3,17 @@ import streamlit as st
 import json
 import datetime
 import requests
+from supabase import create_client  # Updated Supabase import
 
 # Constants
 CONTEXTS = ["romantic", "coparenting", "workplace", "family", "friend"]
 REQUIRE_TOKEN = False
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+# Initialize Supabase
+SUPABASE_URL = st.secrets["supabase"]["url"]
+SUPABASE_KEY = st.secrets["supabase"]["key"]
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # CSS Styles (Cleaner, no red tones)
 st.markdown("""
@@ -58,6 +64,21 @@ def validate_token():
         st.stop()
 
 validate_token()
+
+# Save message to Supabase
+def save_message(contact, message_type, original, result, sentiment, model):
+    try:
+        supabase.table("messages").insert({
+            "contact_name": contact,
+            "type": message_type,
+            "original": original,
+            "result": result,
+            "sentiment": sentiment,
+            "model": model,
+            "timestamp": datetime.datetime.now().isoformat()
+        }).execute()
+    except Exception as e:
+        st.error(f"Supabase Error: {e}")
 
 # API Interaction with Rate Limit Fallback
 def get_ai_response(message, context, is_received=False):
@@ -239,6 +260,16 @@ def render_message_input():
                 contact['history'].append(history_entry)
                 st.session_state.user_stats['total_messages'] += 1
 
+                # Save to Supabase
+                save_message(
+                    st.session_state.active_contact,
+                    mode,
+                    message,
+                    history_entry["result"],
+                    history_entry["sentiment"],
+                    history_entry["model"]
+                )
+
                 st.markdown("### 📊 Was this helpful?")
                 col1, col2, col3 = st.columns(3)
                 for idx, (label, emoji) in enumerate([("👍 Yes", "positive"), ("👌 Okay", "neutral"), ("👎 No", "negative")]):
@@ -302,7 +333,7 @@ def render_tabs():
             journal['insights'] = st.text_area("", value=journal['insights'], key=f"insights_{contact_key}", height=100, placeholder="Important realizations about this relationship...")
 
         with col2:
-            st.markdown('<div class="journal-section">**⚠️ What didn’t work?**</div>', unsafe_allow_html=True)
+            st.markdown('<div class="journal-section">**⚠️ What didn't work?**</div>', unsafe_allow_html=True)
             journal['what_didnt'] = st.text_area("", value=journal['what_didnt'], key=f"didnt_{contact_key}", height=100, placeholder="What caused issues or misunderstandings...")
             st.markdown('<div class="journal-section">**📊 Patterns noticed?**</div>', unsafe_allow_html=True)
             journal['patterns'] = st.text_area("", value=journal['patterns'], key=f"patterns_{contact_key}", height=100, placeholder="Communication patterns you've observed...")
