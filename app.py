@@ -35,7 +35,7 @@ st.markdown("""
 def initialize_session():
     defaults = {
         'token_validated': not REQUIRE_TOKEN,
-        'api_key': st.secrets.get("OPENROUTER_API_KEY", ""),
+        'api_key': st.secrets["openrouter"]["api_key"],
         'contacts': {context: {'context': context, 'history': []} for context in CONTEXTS},
         'active_contact': CONTEXTS[0],
         'journal_entries': {},
