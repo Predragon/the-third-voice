@@ -101,7 +101,7 @@ def initialize_session():
         "active_contact": None, 
         "current_emotional_state": "calm", 
         "user_input": "",
-        "clear_input": False  # Add this flag for clearing input
+        "clear_input": False
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -163,18 +163,12 @@ def process_message(contact_name, message, context):
             # Save to database
             save_message(contact_name, mode, message, response, current_emotion, healing_score)
             
-            # Create a persistent container for the AI response
-            response_container = st.container()
-            with response_container:
-                st.success(f"🌟 **AI Guidance:**\n\n{response}")
-                if healing_score >= 8:
-                    st.balloons()
-                    
             # Store the response in session state to persist across reruns
             st.session_state[f"last_response_{contact_name}"] = {
                 "response": response,
                 "healing_score": healing_score,
-                "timestamp": datetime.datetime.now().timestamp()
+                "timestamp": datetime.datetime.now().timestamp(),
+                "model": MODEL
             }
             
             # Set flag to clear input on next render
@@ -267,7 +261,7 @@ def render_contact_list():
         st.session_state.page = "add_contact"
         st.rerun()
 
-# Conversation screen (simplified - removed emotional state selection)
+# Conversation screen (improved UI layout)
 def render_conversation():
     if st.session_state.page != "conversation" or not st.session_state.active_contact:
         return
@@ -284,40 +278,10 @@ def render_conversation():
         st.session_state.active_contact = None
         st.rerun()
     
-    # Show chat history
     st.markdown("---")
-    if history:
-        st.markdown(f"**Chat History** ({len(history)} messages)")
-        with st.expander("Recent Messages", expanded=True):
-            for msg in reversed(history[-10:]):  # Show last 10 messages
-                emotion_info = EMOTIONAL_STATES.get(msg['emotional_state'], EMOTIONAL_STATES['calm'])
-                
-                st.markdown(f"""
-                **{msg['time']}** | {emotion_info['icon']} {msg['emotional_state'].title()} | 
-                **{msg['type'].title()}** | Score: {msg['healing_score']}/10
-                
-                **Your Message:**
-                > {msg['original']}  
-                
-                **AI Guidance:**
-                > {msg['result']}
-                """)
-                st.markdown("---")
-    else:
-        st.info("No chat history yet. Start a conversation below!")
     
-    # Show last AI response if it exists (to prevent disappearing)
-    last_response_key = f"last_response_{contact_name}"
-    if last_response_key in st.session_state:
-        last_resp = st.session_state[last_response_key]
-        # Only show if it's recent (within last 30 seconds to avoid stale responses)
-        if datetime.datetime.now().timestamp() - last_resp["timestamp"] < 30:
-            with st.container():
-                st.success(f"🌟 **AI Guidance:**\n\n{last_resp['response']}")
-                if last_resp["healing_score"] >= 8:
-                    st.info("✨ High healing score achieved!")
-    
-    # Input area - use dynamic key or value to handle clearing
+    # INPUT SECTION - Moved to top
+    st.markdown("#### 💭 Your Input")
     input_value = "" if st.session_state.get("clear_input", False) else st.session_state.get("conversation_input_value", "")
     
     user_input = st.text_area(
@@ -351,6 +315,77 @@ def render_conversation():
         if st.button("🗑️ Clear", key="clear_input_btn", use_container_width=True):
             st.session_state.clear_input = True
             st.rerun()
+    
+    # AI RESPONSE SECTION - Below input, above history
+    st.markdown("---")
+    st.markdown("#### 🤖 AI Response")
+    
+    # Show last AI response if it exists
+    last_response_key = f"last_response_{contact_name}"
+    if last_response_key in st.session_state:
+        last_resp = st.session_state[last_response_key]
+        # Only show if it's recent (within last 60 seconds to avoid stale responses)
+        if datetime.datetime.now().timestamp() - last_resp["timestamp"] < 60:
+            # Create a container with better styling for copy-paste
+            with st.container():
+                # Main response in a code block for easy copying
+                st.code(last_resp['response'], language=None)
+                
+                # Additional info below
+                col_score, col_model, col_copy = st.columns([2, 2, 1])
+                with col_score:
+                    if last_resp["healing_score"] >= 8:
+                        st.success(f"✨ Healing Score: {last_resp['healing_score']}/10")
+                    else:
+                        st.info(f"💡 Healing Score: {last_resp['healing_score']}/10")
+                
+                with col_model:
+                    st.caption(f"🤖 Model: {last_resp.get('model', MODEL)}")
+                
+                with col_copy:
+                    # Copy button using clipboard
+                    if st.button("📋 Copy", key="copy_response", help="Copy AI response"):
+                        st.write("Response copied to display above ⬆️")
+                
+                # Show balloons for high healing scores
+                if last_resp["healing_score"] >= 8:
+                    st.balloons()
+        else:
+            st.info("💭 Your AI response will appear here after you click Transform")
+    else:
+        st.info("💭 Your AI response will appear here after you click Transform")
+    
+    # CONVERSATION HISTORY - Moved below input and response
+    st.markdown("---")
+    st.markdown("#### 📜 Conversation History")
+    
+    if history:
+        st.markdown(f"**Recent Messages** ({len(history)} total)")
+        
+        # Show messages in a more compact format
+        with st.expander("View Chat History", expanded=False):
+            for msg in reversed(history[-10:]):  # Show last 10 messages
+                emotion_info = EMOTIONAL_STATES.get(msg['emotional_state'], EMOTIONAL_STATES['calm'])
+                
+                # More compact message display
+                st.markdown(f"""
+                **{msg['time']}** | {emotion_info['icon']} {msg['emotional_state'].title()} | 
+                **{msg['type'].title()}** | Score: {msg['healing_score']}/10
+                """)
+                
+                # Your message in a quote block
+                with st.container():
+                    st.markdown("**Your Message:**")
+                    st.info(msg['original'])
+                
+                # AI response in code block for easy copying
+                with st.container():
+                    st.markdown("**AI Guidance:**")
+                    st.code(msg['result'], language=None)
+                
+                st.markdown("---")
+    else:
+        st.info("📝 No chat history yet. Start a conversation above!")
 
 # Add contact page
 def render_add_contact():
