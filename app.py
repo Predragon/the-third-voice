@@ -100,7 +100,8 @@ def initialize_session():
         "page": "contacts", 
         "active_contact": None, 
         "current_emotional_state": "calm", 
-        "user_input": ""
+        "user_input": "",
+        "clear_input": False  # Add this flag
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -161,6 +162,9 @@ def process_message(contact_name, message, context):
             
             # Save to database
             save_message(contact_name, mode, message, response, current_emotion, healing_score)
+            
+            # Set flag to clear input on next rerun
+            st.session_state.clear_input = True
             
             st.success(f"🌟 Guidance:\n{response}")
             if healing_score >= 8:
@@ -258,7 +262,7 @@ def render_contact_list():
         st.session_state.page = "add_contact"
         st.rerun()
 
-# Conversation screen (simplified - removed emotional state selection)
+# Conversation screen (fixed input clearing issue)
 def render_conversation():
     if st.session_state.page != "conversation" or not st.session_state.active_contact:
         return
@@ -297,26 +301,34 @@ def render_conversation():
     else:
         st.info("No chat history yet. Start a conversation below!")
     
-    # Input area (removed emotional state selection for less friction)
-    user_input = st.text_area(
-        "What's happening?", 
-        key="conversation_input", 
-        placeholder="Share their message or your response...", 
-        height=120
-    )
+    # Handle input clearing
+    input_value = ""
+    if st.session_state.clear_input:
+        st.session_state.clear_input = False
+        input_value = ""
     
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        if st.button("✨ Transform", key="transform_message", 
-                    disabled=not user_input.strip(), use_container_width=True):
-            process_message(contact_name, user_input, context)
-            # Clear input after processing
-            st.session_state.conversation_input = ""
-            st.rerun()
-    with col2:
-        if st.button("🗑️ Clear", key="clear_input", use_container_width=True):
-            st.session_state.conversation_input = ""
-            st.rerun()
+    # Input area with form to handle submission properly
+    with st.form("message_form", clear_on_submit=True):
+        user_input = st.text_area(
+            "What's happening?", 
+            value=input_value,
+            placeholder="Share their message or your response...", 
+            height=120
+        )
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            transform_submitted = st.form_submit_button("✨ Transform", use_container_width=True)
+        with col2:
+            clear_submitted = st.form_submit_button("🗑️ Clear", use_container_width=True)
+    
+    # Handle form submissions
+    if transform_submitted and user_input.strip():
+        process_message(contact_name, user_input, context)
+        st.rerun()
+    
+    if clear_submitted:
+        st.rerun()
 
 # Add contact page
 def render_add_contact():
