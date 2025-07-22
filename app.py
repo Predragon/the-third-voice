@@ -12,16 +12,7 @@ CONTEXTS = {
     "friend": {"icon": "🤝", "description": "Friendships & social bonds"}
 }
 
-EMOTIONAL_STATES = {
-    "calm": {"icon": "😌", "color": "#10B981"},
-    "frustrated": {"icon": "😤", "color": "#F59E0B"},
-    "hurt": {"icon": "💔", "color": "#EF4444"},
-    "anxious": {"icon": "😰", "color": "#8B5CF6"},
-    "angry": {"icon": "😡", "color": "#DC2626"},
-    "confused": {"icon": "😕", "color": "#6B7280"},
-    "hopeful": {"icon": "🌅", "color": "#06B6D4"},
-    "overwhelmed": {"icon": "🌀", "color": "#F97316"}
-}
+
 
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODEL = "google/gemma-2-9b-it:free"
@@ -59,7 +50,6 @@ def load_contacts_and_history():
                 "type": msg["type"], 
                 "original": msg["original"], 
                 "result": msg["result"],
-                "emotional_state": msg.get("emotional_state", "calm"), 
                 "healing_score": msg.get("healing_score", 0)
             })
         return contacts_data
@@ -99,7 +89,6 @@ def initialize_session():
         "contacts": load_contacts_and_history(), 
         "page": "contacts", 
         "active_contact": None, 
-        "current_emotional_state": "calm", 
         "user_input": "",
         "clear_input": False
     }
@@ -114,17 +103,16 @@ def process_message(contact_name, message, context):
     if not message.strip():
         return
     
-    current_emotion = st.session_state.current_emotional_state
     is_incoming = any(indicator in message.lower() for indicator in ["said:", "wrote:", "texted:", "told me:"])
     mode = "translate" if is_incoming else "coach"
     
     system_prompt = (
-        f"You are a compassionate relationship guide. The user is feeling {current_emotion} in their {context} relationship with {contact_name}. "
+        f"You are a compassionate relationship guide helping with a {context} relationship with {contact_name}. "
         f"{'Understand what they mean and suggest a loving response.' if is_incoming else 'Reframe their message to be constructive and loving.'} "
         "Keep it concise, insightful, and actionable (2-3 paragraphs)."
     )
     
-    with st.spinner(f"{EMOTIONAL_STATES[current_emotion]['icon']} Processing..."):
+    with st.spinner("🤖 Processing..."):
         try:
             response = requests.post(
                 API_URL, 
@@ -142,7 +130,7 @@ def process_message(contact_name, message, context):
             ).json()["choices"][0]["message"]["content"].strip()
             
             healing_score = 5 + (1 if len(response) > 200 else 0) + min(2, sum(1 for word in ["understand", "love", "connect", "care"] if word in response.lower()))
-            healing_score = min(10, healing_score + (1 if current_emotion in ["angry", "hurt", "frustrated"] else 0))
+            healing_score = min(10, healing_score)
             
             # Add to session state history immediately
             new_message = {
@@ -151,7 +139,6 @@ def process_message(contact_name, message, context):
                 "type": mode, 
                 "original": message, 
                 "result": response, 
-                "emotional_state": current_emotion, 
                 "healing_score": healing_score
             }
             
@@ -160,8 +147,8 @@ def process_message(contact_name, message, context):
             
             st.session_state.contacts[contact_name]["history"].append(new_message)
             
-            # Save to database
-            save_message(contact_name, mode, message, response, current_emotion, healing_score)
+            # Save to database (with empty emotional_state for compatibility)
+            save_message(contact_name, mode, message, response, "calm", healing_score)
             
             # Store the response in session state to persist across reruns
             st.session_state[f"last_response_{contact_name}"] = {
@@ -328,11 +315,19 @@ def render_conversation():
         if datetime.datetime.now().timestamp() - last_resp["timestamp"] < 60:
             # Create a container with better styling for copy-paste
             with st.container():
-                # Main response in a code block for easy copying
-                st.code(last_resp['response'], language=None)
+                # Main response with proper text wrapping
+                st.markdown("**AI Guidance:**")
+                st.text_area(
+                    "", 
+                    value=last_resp['response'],
+                    height=200,
+                    key="ai_response_display",
+                    help="Click inside and Ctrl+A to select all, then Ctrl+C to copy",
+                    disabled=False
+                )
                 
                 # Additional info below
-                col_score, col_model, col_copy = st.columns([2, 2, 1])
+                col_score, col_model = st.columns([1, 1])
                 with col_score:
                     if last_resp["healing_score"] >= 8:
                         st.success(f"✨ Healing Score: {last_resp['healing_score']}/10")
@@ -341,11 +336,6 @@ def render_conversation():
                 
                 with col_model:
                     st.caption(f"🤖 Model: {last_resp.get('model', MODEL)}")
-                
-                with col_copy:
-                    # Copy button using clipboard
-                    if st.button("📋 Copy", key="copy_response", help="Copy AI response"):
-                        st.write("Response copied to display above ⬆️")
                 
                 # Show balloons for high healing scores
                 if last_resp["healing_score"] >= 8:
@@ -365,12 +355,10 @@ def render_conversation():
         # Show messages in a more compact format
         with st.expander("View Chat History", expanded=False):
             for msg in reversed(history[-10:]):  # Show last 10 messages
-                emotion_info = EMOTIONAL_STATES.get(msg['emotional_state'], EMOTIONAL_STATES['calm'])
                 
                 # More compact message display
                 st.markdown(f"""
-                **{msg['time']}** | {emotion_info['icon']} {msg['emotional_state'].title()} | 
-                **{msg['type'].title()}** | Score: {msg['healing_score']}/10
+                **{msg['time']}** | **{msg['type'].title()}** | Score: {msg['healing_score']}/10
                 """)
                 
                 # Your message in a quote block
@@ -378,10 +366,16 @@ def render_conversation():
                     st.markdown("**Your Message:**")
                     st.info(msg['original'])
                 
-                # AI response in code block for easy copying
+                # AI response in text area for easy copying and proper wrapping
                 with st.container():
                     st.markdown("**AI Guidance:**")
-                    st.code(msg['result'], language=None)
+                    st.text_area(
+                        "",
+                        value=msg['result'],
+                        height=100,
+                        key=f"history_response_{msg['id']}",
+                        disabled=False
+                    )
                 
                 st.markdown("---")
     else:
