@@ -333,7 +333,7 @@ def render_tabs():
             journal['insights'] = st.text_area("", value=journal['insights'], key=f"insights_{contact_key}", height=100, placeholder="Important realizations about this relationship...")
 
         with col2:
-            st.markdown('<div class="journal-section">**⚠️ What didn't work?**</div>', unsafe_allow_html=True)
+            st.markdown("<div class="journal-section">**⚠️ What didn't work?**</div>", unsafe_allow_html=True)
             journal['what_didnt'] = st.text_area("", value=journal['what_didnt'], key=f"didnt_{contact_key}", height=100, placeholder="What caused issues or misunderstandings...")
             st.markdown('<div class="journal-section">**📊 Patterns noticed?**</div>', unsafe_allow_html=True)
             journal['patterns'] = st.text_area("", value=journal['patterns'], key=f"patterns_{contact_key}", height=100, placeholder="Communication patterns you've observed...")
