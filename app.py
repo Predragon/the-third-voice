@@ -1,4 +1,4 @@
-# the-third-voice/app.py
+u# the-third-voice/app.py
 import streamlit as st
 import json
 import datetime
@@ -96,3 +96,8 @@ def contact_sidebar():
     st.session_state.active_contact = selected
 
 contact_sidebar()
+
+# Render Main Interface
+render_main()
+render_message_input()
+render_tabs()
