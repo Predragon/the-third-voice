@@ -264,12 +264,63 @@ def render_contact_list():
         
     st.markdown("### 🎙️ The Third Voice")
     
-    # Show existing contacts - merge name with button
-    for name, data in sorted(st.session_state.contacts.items(), key=lambda x: x[1]["history"][-1]["time"] if x[1]["history"] else x[1]["created_at"], reverse=True):
+    # Show existing contacts
+    for name, data in sorted(st.session_state.contacts.items(), 
+                           key=lambda x: x[1]["history"][-1]["time"] if x[1]["history"] else x[1]["created_at"], 
+                           reverse=True):
         context = CONTEXTS.get(data["context"], CONTEXTS["family"])
         last_msg = data["history"][-1] if data["history"] else None
         preview = f"{last_msg['original'][:30]}..." if last_msg else "Start chatting!"
         time = last_msg["time"] if last_msg else "New"
+        
+        # Create a container for each contact card
+        with st.container():
+            col1, col2 = st.columns([4, 1])
+            
+            # Main contact info (clickable area)
+            with col1:
+                # Use a button to make the whole area clickable
+                if st.button(
+                    f"**{context['icon']} {name}**  \n"
+                    f"{context['description']} • {time}  \n"
+                    f"`{preview}`",
+                    key=f"contact_{name}",
+                    use_container_width=True
+                ):
+                    st.session_state.active_contact = name
+                    st.session_state.page = "conversation"
+                    st.rerun()
+            
+            # Edit and delete buttons
+            with col2:
+                btn_col1, btn_col2 = st.columns(2)
+                
+                with btn_col1:
+                    if st.button("✏️", 
+                                key=f"edit_{name}",
+                                help=f"Edit {name}"):
+                        st.session_state.edit_contact = {
+                            "id": data["id"],
+                            "name": name,
+                            "context": data["context"]
+                        }
+                        st.session_state.page = "edit_contact"
+                        st.rerun()
+                
+                with btn_col2:
+                    if st.button("🗑️", 
+                                key=f"delete_{name}",
+                                help=f"Delete {name}"):
+                        if delete_contact(data["id"]):
+                            st.success(f"Deleted contact: {name}")
+                            st.rerun()
+            
+            st.markdown("---")  # Divider between contacts
+    
+    # Add new contact button
+    if st.button("➕ Add New Contact", use_container_width=True):
+        st.session_state.page = "add_contact"
+        st.rerun()
         
         # Create columns for the contact button and edit/delete buttons
         col1, col2 = st.columns([4, 1])
