@@ -96,7 +96,17 @@ def contact_sidebar():
     st.session_state.active_contact = selected
 
 contact_sidebar()
+# --- Placeholder Rendering Functions ---
 
+def render_main():
+    st.title("🎙️ The Third Voice")
+    st.markdown("Welcome! Select a contact from the sidebar or add a new one to begin.")
+
+def render_message_input():
+    st.info("📝 Message input area will appear here once implemented.")
+
+def render_tabs():
+    st.markdown("📜 Tabs like History, Journal, About will appear here.")
 # Render Main Interface
 render_main()
 render_message_input()
