@@ -177,29 +177,3 @@ def render_history():
         st.success(f"AI: {entry['result']}")
 
 render_history()
-
-
-✅ Your app now:
-
-Loads/saves message history from Supabase
-
-Lets users choose context and add contacts
-
-Processes AI messages and saves them
-
-Shows history after every interaction
-
-
-You’re good to test this now live on Streamlit. Just say if you want to:
-
-Add journaling
-
-Export history
-
-Show stats
-
-Or start multi-user support
-
-
-All possible from here 💪
-
