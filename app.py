@@ -5,7 +5,7 @@ import requests
 from supabase import create_client
 import time
 
-# Constants
+# Constants - Keep existing
 CONTEXTS = {
     "romantic": {"icon": "💕", "color": "#FF6B9D", "description": "Partner & intimate relationships"},
     "coparenting": {"icon": "👨‍👩‍👧‍👦", "color": "#4ECDC4", "description": "Raising children together"},
@@ -18,68 +18,207 @@ EMOTIONAL_STATES = ["calm", "frustrated", "hurt", "anxious", "angry", "confused"
 REQUIRE_TOKEN = False
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# Initialize Supabase
+# Initialize Supabase - Keep existing
 SUPABASE_URL = st.secrets["supabase"]["url"]
 SUPABASE_KEY = st.secrets["supabase"]["key"]
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Custom CSS for healing-focused UI
-def inject_custom_css():
+# Mobile-First WhatsApp-Inspired CSS
+def inject_mobile_css():
     st.markdown("""
     <style>
-    .main-header {
-        text-align: center;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 2rem;
-        border-radius: 15px;
+    /* Mobile-first responsive design */
+    .main > div {
+        padding-top: 1rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    /* WhatsApp-style header */
+    .chat-header {
+        background: #075E54;
         color: white;
-        margin-bottom: 2rem;
-    }
-    .emotion-card {
-        background: #f8f9fa;
-        border-left: 4px solid #667eea;
         padding: 1rem;
-        border-radius: 8px;
-        margin: 1rem 0;
+        margin: -1rem -1rem 1rem -1rem;
+        text-align: center;
+        position: sticky;
+        top: 0;
+        z-index: 100;
     }
-    .healing-message {
-        background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+    
+    /* Contact list - WhatsApp style */
+    .contact-list {
+        background: white;
+        border-radius: 0;
+        margin: 0;
+    }
+    
+    .contact-item {
+        display: flex;
+        align-items: center;
+        padding: 1rem;
+        border-bottom: 1px solid #E5E5E5;
+        background: white;
+        cursor: pointer;
+        min-height: 60px;
+        transition: background-color 0.2s;
+    }
+    
+    .contact-item:hover {
+        background: #F5F5F5;
+    }
+    
+    .contact-item:active {
+        background: #E5E5E5;
+    }
+    
+    .contact-avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-right: 1rem;
+        flex-shrink: 0;
+    }
+    
+    .contact-info {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .contact-name {
+        font-weight: 600;
+        font-size: 1.1rem;
+        color: #000;
+        margin: 0;
+        line-height: 1.2;
+    }
+    
+    .contact-last {
+        color: #667781;
+        font-size: 0.9rem;
+        margin: 0;
+        margin-top: 0.2rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .contact-status {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        margin-left: 0.5rem;
+    }
+    
+    .contact-time {
+        color: #667781;
+        font-size: 0.8rem;
+        white-space: nowrap;
+    }
+    
+    .status-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-top: 0.2rem;
+    }
+    
+    .status-calm { background: #4CAF50; }
+    .status-tense { background: #FF9800; }
+    .status-crisis { background: #F44336; }
+    
+    /* Conversation screen */
+    .conversation-header {
+        background: #075E54;
+        color: white;
+        padding: 1rem;
+        margin: -1rem -1rem 1rem -1rem;
+        display: flex;
+        align-items: center;
+    }
+    
+    .back-button {
+        background: none;
+        border: none;
+        color: white;
+        font-size: 1.2rem;
+        margin-right: 1rem;
+        cursor: pointer;
+        padding: 0.5rem;
+    }
+    
+    /* Message input area */
+    .message-input-area {
+        background: #F0F0F0;
+        padding: 1rem;
+        margin: 1rem -1rem -1rem -1rem;
+        position: sticky;
+        bottom: 0;
+    }
+    
+    /* AI Intervention popup */
+    .ai-intervention {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
         padding: 1.5rem;
         border-radius: 15px;
-        border: none;
-        color: #2d3748;
         margin: 1rem 0;
+        animation: slideIn 0.3s ease-out;
     }
+    
+    @keyframes slideIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* Mobile buttons */
     .stButton > button {
-        border-radius: 25px;
+        width: 100% !important;
+        height: 50px !important;
+        border-radius: 25px !important;
+        font-weight: 600 !important;
+        font-size: 1rem !important;
+    }
+    
+    /* Hide sidebar on mobile */
+    .css-1d391kg {
+        display: none;
+    }
+    
+    /* Quick add contact */
+    .quick-add {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: #25D366;
+        color: white;
         border: none;
-        padding: 0.5rem 2rem;
-        font-weight: 600;
-        transition: all 0.3s ease;
+        font-size: 1.5rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 1000;
     }
-    .context-selector {
-        background: white;
-        border-radius: 15px;
-        padding: 1rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    .contact-card {
-        background: white;
-        border-radius: 10px;
-        padding: 1rem;
-        margin: 0.5rem 0;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        border-left: 4px solid #667eea;
+    
+    /* Responsive text sizes */
+    @media (max-width: 768px) {
+        .contact-name { font-size: 1rem; }
+        .contact-last { font-size: 0.85rem; }
+        .contact-time { font-size: 0.75rem; }
     }
     </style>
     """, unsafe_allow_html=True)
 
-inject_custom_css()
+inject_mobile_css()
 
-# Enhanced contact loading from Supabase
+# Keep existing data functions
 def load_contacts_and_history():
     try:
-        # Load contacts
         contacts_response = supabase.table("contacts").select("*").execute()
         contacts_data = {c["name"]: {
             "context": c["context"],
@@ -89,13 +228,11 @@ def load_contacts_and_history():
             "created_at": c.get("created_at", datetime.datetime.now().isoformat())
         } for c in contacts_response.data}
         
-        # Load message history
         messages_response = supabase.table("messages").select("*").order("timestamp").execute()
         
         for msg in messages_response.data:
             contact_name = msg["contact_name"]
             if contact_name not in contacts_data:
-                # Create contact if not exists (backwards compatibility)
                 contacts_data[contact_name] = {
                     'context': "family", 
                     'history': [], 
@@ -122,7 +259,6 @@ def load_contacts_and_history():
         st.warning(f"⚠️ Could not load data from Supabase: {e}")
         return {}
 
-# Save contact to database
 def save_contact(name, context):
     try:
         supabase.table("contacts").insert({
@@ -135,48 +271,6 @@ def save_contact(name, context):
         st.error(f"Error saving contact: {e}")
         return False
 
-# Initialize Session State
-def initialize_session():
-    defaults = {
-        'token_validated': not REQUIRE_TOKEN,
-        'api_key': st.secrets["openrouter"]["api_key"],
-        'contacts': load_contacts_and_history(),
-        'active_contact': None,
-        'current_emotional_state': 'calm',
-        'conversation_goal': '',
-        'active_mode': None,
-        'show_guidance': True,
-        'user_stats': {
-            'total_conversations': 0, 
-            'healing_moments': 0, 
-            'emotional_growth': 0,
-            'days_since_start': 0
-        }
-    }
-    for key, value in defaults.items():
-        st.session_state.setdefault(key, value)
-
-initialize_session()
-
-# Token Validation
-def validate_token():
-    if REQUIRE_TOKEN and not st.session_state.token_validated:
-        st.markdown('<div class="main-header"><h1>🎙️ The Third Voice</h1><p><em>When both people are speaking from pain, someone must be the third voice.</em></p></div>', unsafe_allow_html=True)
-        st.warning("🔐 Access restricted. Enter beta token to continue.")
-        token = st.text_input("Token:", type="password")
-        if st.button("Validate"):
-            if token in ["ttv-beta-001", "ttv-beta-002", "ttv-beta-003"]:
-                st.session_state.token_validated = True
-                st.success("✅ Authorized - Welcome to your healing journey")
-                time.sleep(1)
-                st.rerun()
-            else:
-                st.error("Invalid token")
-        st.stop()
-
-validate_token()
-
-# Enhanced save message function
 def save_message(contact, message_type, original, result, sentiment, emotional_state, model, healing_score=0):
     try:
         insert_data = {
@@ -197,314 +291,264 @@ def save_message(contact, message_type, original, result, sentiment, emotional_s
             if "emotional_state" in str(e).lower():
                 del insert_data["emotional_state"]
                 supabase.table("messages").insert(insert_data).execute()
-                st.warning("⚠️ Saved message without emotional_state due to missing column.")
             else:
                 raise e
     except Exception as e:
         st.error(f"Supabase Error: {e}")
 
-# Contact Management in Sidebar
-def render_sidebar():
-    with st.sidebar:
-        st.markdown("## 👥 Your Contacts")
+# Initialize Session State - Keep existing
+def initialize_session():
+    defaults = {
+        'token_validated': not REQUIRE_TOKEN,
+        'api_key': st.secrets["openrouter"]["api_key"],
+        'contacts': load_contacts_and_history(),
+        'active_contact': None,
+        'current_emotional_state': 'calm',
+        'conversation_goal': '',
+        'show_intervention': False,
+        'user_input': '',
+        'user_stats': {
+            'total_conversations': 0, 
+            'healing_moments': 0, 
+            'emotional_growth': 0,
+            'days_since_start': 0
+        }
+    }
+    for key, value in defaults.items():
+        st.session_state.setdefault(key, value)
+
+initialize_session()
+
+# Token validation - Keep existing
+def validate_token():
+    if REQUIRE_TOKEN and not st.session_state.token_validated:
+        st.markdown('<div class="chat-header"><h1>🎙️ The Third Voice</h1><p><em>When both people are speaking from pain, someone must be the third voice.</em></p></div>', unsafe_allow_html=True)
+        st.warning("🔐 Access restricted. Enter beta token to continue.")
+        token = st.text_input("Token:", type="password")
+        if st.button("Validate"):
+            if token in ["ttv-beta-001", "ttv-beta-002", "ttv-beta-003"]:
+                st.session_state.token_validated = True
+                st.success("✅ Authorized - Welcome to your healing journey")
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.error("Invalid token")
+        st.stop()
+
+validate_token()
+
+# NEW: Mobile Contact List Landing Screen
+def render_contact_list():
+    if st.session_state.active_contact:
+        return  # Skip if in conversation
         
-        # Display existing contacts
-        if st.session_state.contacts:
-            for contact_name, contact_data in st.session_state.contacts.items():
-                context = contact_data.get('context', 'family')
-                context_info = CONTEXTS.get(context, CONTEXTS['family'])
-                history_count = len(contact_data['history'])
-                healing_moments = len([h for h in contact_data['history'] if h.get('healing_score', 0) > 7])
-                
-                # Contact button with stats
+    # Header
+    st.markdown("""
+    <div class="chat-header">
+        <h2>🎙️ The Third Voice</h2>
+        <p style="margin: 0; opacity: 0.9; font-size: 0.9rem;">Healing conversations, one message at a time</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Contact list
+    if st.session_state.contacts:
+        # Sort contacts by recent activity
+        sorted_contacts = sorted(
+            st.session_state.contacts.items(),
+            key=lambda x: x[1]['history'][-1]['time'] if x[1]['history'] else x[1]['created_at'],
+            reverse=True
+        )
+        
+        st.markdown('<div class="contact-list">', unsafe_allow_html=True)
+        
+        for contact_name, contact_data in sorted_contacts:
+            context = contact_data.get('context', 'family')
+            context_info = CONTEXTS.get(context, CONTEXTS['family'])
+            
+            # Determine status
+            recent_history = contact_data['history'][-3:] if contact_data['history'] else []
+            healing_scores = [h.get('healing_score', 0) for h in recent_history]
+            
+            if not healing_scores:
+                status_class = "status-calm"
+                status_text = "Ready to connect"
+            elif max(healing_scores) > 7:
+                status_class = "status-calm"
+                status_text = "Growing stronger"
+            elif any(score < 4 for score in healing_scores):
+                status_class = "status-crisis" 
+                status_text = "Needs attention"
+            else:
+                status_class = "status-tense"
+                status_text = "Building bridges"
+            
+            # Last activity
+            if contact_data['history']:
+                last_time = contact_data['history'][-1]['time']
+                last_preview = contact_data['history'][-1]['original'][:40] + "..."
+            else:
+                last_time = "New"
+                last_preview = f"Start healing conversations with {contact_name}"
+            
+            # Contact item - use columns for click handling
+            col1, = st.columns([1])
+            with col1:
                 if st.button(
-                    f"{context_info['icon']} {contact_name}", 
-                    key=f"contact_{contact_name}",
-                    use_container_width=True
+                    f"📱 {contact_name}",  # Hidden text for button
+                    key=f"contact_btn_{contact_name}",
+                    use_container_width=True,
+                    help=f"Open conversation with {contact_name}"
                 ):
                     st.session_state.active_contact = contact_name
                     st.rerun()
-                
-                # Show active contact indicator
-                if contact_name == st.session_state.active_contact:
-                    st.markdown(f"""
-                    <div class="contact-card">
-                        <small style='color: {context_info['color']};'>
-                            🔸 Active • {context.title()} • {history_count} msgs • {healing_moments} breakthroughs
-                        </small>
-                    </div>
-                    """, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        # Add New Contact Form
-        with st.expander("➕ Add New Contact", expanded=not st.session_state.contacts):
-            st.markdown("**Create a new relationship**")
-            new_name = st.text_input("Contact name", placeholder="e.g., 'Sarah', 'Mom', 'Alex', 'Boss'", help="This can be their real name or how you refer to them")
-            new_context = st.selectbox("Relationship type", list(CONTEXTS.keys()), help="Choose the category that best describes your relationship")
             
-            # Show context description
-            if new_context:
-                st.markdown(f"*{CONTEXTS[new_context]['description']}*")
-            
-            if st.button("✨ Create Contact", use_container_width=True) and new_name.strip():
-                new_name = new_name.strip()
-                if new_name not in st.session_state.contacts:
-                    if save_contact(new_name, new_context):
-                        st.session_state.contacts[new_name] = {
-                            "context": new_context,
-                            "history": [], 
-                            "emotional_journey": [],
-                            "breakthrough_moments": [],
-                            "created_at": datetime.datetime.now().isoformat()
-                        }
-                        st.session_state.active_contact = new_name
-                        st.success(f"✨ Added {new_name} to your {new_context} relationships")
-                        time.sleep(1)
-                        st.rerun()
-                else:
-                    st.warning("Contact already exists!")
+            # Custom contact display
+            st.markdown(f"""
+            <div class="contact-item">
+                <div class="contact-avatar" style="background: {context_info['color']}20; color: {context_info['color']};">
+                    {context_info['icon']}
+                </div>
+                <div class="contact-info">
+                    <div class="contact-name">{contact_name}</div>
+                    <div class="contact-last">{last_preview}</div>
+                </div>
+                <div class="contact-status">
+                    <div class="contact-time">{last_time}</div>
+                    <div class="status-dot {status_class}"></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
         
-        # User Statistics
-        if st.session_state.contacts and any(len(c['history']) > 0 for c in st.session_state.contacts.values()):
-            st.markdown("---")
-            st.markdown("### 📊 Your Journey")
-            total_convos = sum(len(c['history']) for c in st.session_state.contacts.values())
-            total_healing = sum(len([h for h in c['history'] if h.get('healing_score', 0) > 7]) for c in st.session_state.contacts.values())
-            
-            st.metric("Total Conversations", total_convos)
-            st.metric("Healing Moments", total_healing)
-            st.metric("Active Relationships", len(st.session_state.contacts))
-
-render_sidebar()
-
-# Emotional Check-in Component
-def render_emotional_checkin():
-    st.markdown("### 🧘‍♀️ How are you feeling right now?")
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        current_state = st.selectbox(
-            "Your emotional state:",
-            EMOTIONAL_STATES,
-            index=EMOTIONAL_STATES.index(st.session_state.current_emotional_state),
-            help="Being honest about your emotions helps me guide you better"
-        )
-        st.session_state.current_emotional_state = current_state
-    
-    with col2:
-        conversation_goal = st.text_input(
-            "What do you hope to achieve?",
-            value=st.session_state.conversation_goal,
-            placeholder="e.g., 'Reconnect with my partner', 'Set boundaries kindly'",
-            help="Having a clear intention helps create healing conversations"
-        )
-        st.session_state.conversation_goal = conversation_goal
-
-# Main Header
-def render_main_header():
-    if st.session_state.active_contact:
-        contact_data = st.session_state.contacts[st.session_state.active_contact]
-        context = contact_data.get('context', 'family')
-        context_info = CONTEXTS.get(context, CONTEXTS['family'])
-        
-        st.markdown(f"""
-        <div class="main-header">
-            <h1>{context_info['icon']} The Third Voice</h1>
-            <p><em>When both people are speaking from pain, someone must be the third voice.</em></p>
-            <h3>Supporting your relationship with {st.session_state.active_contact}</h3>
-            <p>{context_info['description']}</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
     else:
-        st.markdown(f"""
-        <div class="main-header">
-            <h1>🎙️ The Third Voice</h1>
-            <p><em>When both people are speaking from pain, someone must be the third voice.</em></p>
-            <h3>Select or add a contact to begin healing conversations</h3>
+        # Empty state
+        st.markdown("""
+        <div style="text-align: center; padding: 3rem 1rem; color: #667781;">
+            <h3>💝 Welcome to Your Healing Journey</h3>
+            <p>Add your first contact to begin transforming difficult conversations into moments of connection.</p>
         </div>
         """, unsafe_allow_html=True)
+    
+    # Quick add button
+    st.markdown("""
+    <button class="quick-add" onclick="document.querySelector('[data-testid=\\"add_contact_expander\\"]').click()">
+        ➕
+    </button>
+    """, unsafe_allow_html=True)
 
-render_main_header()
-
-# Contact Selection Prompt
-def render_contact_selection():
-    if not st.session_state.active_contact and st.session_state.contacts:
-        st.markdown("### 💝 Choose who you'd like to communicate with")
-        st.markdown("Select a contact from the sidebar to start crafting healing conversations together.")
-        
-        # Quick contact buttons
-        col1, col2, col3 = st.columns(3)
-        contact_list = list(st.session_state.contacts.keys())
-        
-        for i, contact_name in enumerate(contact_list[:3]):
-            context = st.session_state.contacts[contact_name].get('context', 'family')
-            context_info = CONTEXTS.get(context, CONTEXTS['family'])
-            
-            with [col1, col2, col3][i]:
-                if st.button(f"{context_info['icon']} {contact_name}", use_container_width=True):
-                    st.session_state.active_contact = contact_name
-                    st.rerun()
-
-if not st.session_state.active_contact:
-    render_contact_selection()
-
-# Healing-Focused Mode Selection
-def render_healing_modes():
+# NEW: Mobile Conversation Screen
+def render_conversation():
     if not st.session_state.active_contact:
         return
         
-    st.markdown("### 🌟 How can I help you heal this conversation?")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if st.button("🤲 Before I Send", use_container_width=True, help="Transform your words with love before sending"):
-            st.session_state.active_mode = "coach"
-            st.rerun()
-    
-    with col2:
-        if st.button("💝 Understand Their Heart", use_container_width=True, help="Decode the deeper emotions behind their words"):
-            st.session_state.active_mode = "translate"
-            st.rerun()
-    
-    with col3:
-        if st.button("🕊️ Find Peace Together", use_container_width=True, help="Navigate conflict toward mutual understanding"):
-            st.session_state.active_mode = "mediate"
-            st.rerun()
-
-if st.session_state.active_contact and not st.session_state.active_mode:
-    render_emotional_checkin()
-    render_healing_modes()
-
-# Enhanced Message Processing
-def render_message_area():
-    if not st.session_state.active_mode or not st.session_state.active_contact:
-        return
-    
-    mode = st.session_state.active_mode
     contact_name = st.session_state.active_contact
-    contact_context = st.session_state.contacts[contact_name].get('context', 'family')
+    contact_data = st.session_state.contacts[contact_name]
+    context = contact_data.get('context', 'family')
+    context_info = CONTEXTS.get(context, CONTEXTS['family'])
     
-    mode_config = {
-        "coach": {
-            "title": "🤲 Refining Your Words with Love",
-            "placeholder": f"What do you want to say to {contact_name}? I'll help you say it with love...",
-            "prompt": f"""You are The Third Voice - an AI that helps heal {contact_context} communication. The user is feeling {st.session_state.current_emotional_state} and wants to {st.session_state.conversation_goal}. They're communicating with {contact_name} in a {contact_context} relationship context.
-
-Transform their message to be:
-- Loving but authentic
-- Clear but not accusatory  
-- Vulnerable but boundaried
-- Healing-focused
-- Appropriate for a {contact_context} relationship
-
-Original message:"""
-        },
-        "translate": {
-            "title": "💝 Understanding Their Deeper Heart",
-            "placeholder": f"Share what {contact_name} said... I'll help you see their heart behind the words...",
-            "prompt": f"""You are The Third Voice - an AI that reveals the heart behind hurtful words. The user is feeling {st.session_state.current_emotional_state}. They received a message from {contact_name} in their {contact_context} relationship.
-
-Help them understand:
-- What pain might be driving {contact_name}'s words
-- What they might really need
-- How to respond with compassion in a {contact_context} context
-- What healing looks like here
-
-Their message was:"""
-        },
-        "mediate": {
-            "title": "🕊️ Finding the Path to Peace",
-            "placeholder": f"Describe the conflict with {contact_name}... I'll help you find the bridge to understanding...",
-            "prompt": f"""You are The Third Voice - a wise mediator for {contact_context} healing. The user feels {st.session_state.current_emotional_state} and wants to {st.session_state.conversation_goal}. This involves their relationship with {contact_name}.
-
-Provide:
-- A path toward mutual understanding
-- Specific words they can use
-- How to validate both perspectives
-- Next steps for healing in a {contact_context} relationship
-
-The situation:"""
-        }
-    }
+    # Conversation header
+    st.markdown(f"""
+    <div class="conversation-header">
+        <button class="back-button" onclick="window.location.reload()">←</button>
+        <div>
+            <div style="font-weight: 600; font-size: 1.1rem;">{context_info['icon']} {contact_name}</div>
+            <div style="font-size: 0.9rem; opacity: 0.8;">{context_info['description']}</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    config = mode_config[mode]
-    st.markdown(f"### {config['title']}")
-    st.markdown(f"*Working on your relationship with **{contact_name}***")
+    # Back button functionality
+    if st.button("← Back to Contacts", key="back_btn", help="Return to contact list"):
+        st.session_state.active_contact = None
+        st.rerun()
     
-    # Emotional context reminder
-    if st.session_state.current_emotional_state != 'calm':
-        st.markdown(f'<div class="emotion-card">💭 I see you\'re feeling <strong>{st.session_state.current_emotional_state}</strong>. Let me help you navigate this with wisdom.</div>', unsafe_allow_html=True)
+    # Message input area
+    st.markdown(f"### 💬 Message {contact_name}")
     
-    message = st.text_area(
-        "Your message:",
-        placeholder=config['placeholder'],
-        height=150,
-        key=f"input_{mode}_{contact_name}"
+    user_input = st.text_area(
+        "What would you like to say?",
+        value=st.session_state.get('user_input', ''),
+        placeholder=f"Type your message to {contact_name} or paste something they sent you...",
+        height=120,
+        key="main_input"
     )
     
+    # AI Intervention Logic
+    if user_input and len(user_input.strip()) > 10:
+        # Detect if this looks like a crisis moment
+        crisis_words = ['angry', 'hate', 'never', 'always', 'stupid', 'ridiculous', 'done', 'enough']
+        paste_indicators = ['\n', 'said:', 'wrote:', 'texted:']
+        
+        is_crisis = any(word in user_input.lower() for word in crisis_words)
+        is_paste = any(indicator in user_input.lower() for indicator in paste_indicators)
+        
+        if is_crisis or is_paste or st.session_state.current_emotional_state in ['angry', 'frustrated', 'hurt']:
+            st.markdown(f"""
+            <div class="ai-intervention">
+                <h4>🛑 Hold on - let's breathe together</h4>
+                <p>I can feel the intensity in this moment. Before responding to {contact_name}, let's remember your goal is healing this {context} relationship.</p>
+                <p>💝 <strong>What {contact_name} might really need:</strong> Understanding, connection, to feel heard</p>
+                <p>🕊️ <strong>What love looks like here:</strong> Responding from wisdom, not pain</p>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # Send button
     col1, col2 = st.columns([3, 1])
     with col1:
-        submit_button = st.button("✨ Help Me Heal This", use_container_width=True)
+        if st.button("✨ Help Me Heal This", use_container_width=True, disabled=not user_input.strip()):
+            process_message(contact_name, user_input, context)
     with col2:
-        if st.button("← Back"):
-            st.session_state.active_mode = None
+        if st.button("🔄", help="Clear input"):
+            st.session_state.user_input = ''
             st.rerun()
-    
-    if submit_button and message:
-        with st.spinner("🌟 Channeling wisdom and love..."):
-            models = [
-                "google/gemma-2-9b-it:free",
-                "meta-llama/llama-3.2-3b-instruct:free",
-                "microsoft/phi-3-mini-128k-instruct:free"
-            ]
-            reply = None
-            used_model = None
-            errors = []
 
-            for model in models:
-                try:
-                    messages = [
-                        {"role": "system", "content": config['prompt']},
-                        {"role": "user", "content": message}
-                    ]
-                    
-                    res = requests.post(
-                        API_URL, 
-                        headers={"Authorization": f"Bearer {st.session_state.api_key}"},
-                        json={
-                            "model": model, 
-                            "messages": messages,
-                            "temperature": 0.7
-                        }
-                    )
-                    
-                    res.raise_for_status()
-                    response_data = res.json()
-                    
-                    if "choices" not in response_data:
-                        raise ValueError(f"Unexpected API response from {model}")
-                    
-                    reply = response_data["choices"][0]["message"]["content"]
-                    used_model = model
-                    break
+# Process message with AI
+def process_message(contact_name, message, context):
+    if not message.strip():
+        return
+        
+    with st.spinner("🌟 Channeling wisdom and love..."):
+        # Smart prompt based on content
+        if any(indicator in message.lower() for indicator in ['said:', 'wrote:', 'texted:', '\n']):
+            mode = "translate"
+            prompt = f"Help me understand what {contact_name} really means behind these words in our {context} relationship:"
+        else:
+            mode = "coach" 
+            prompt = f"Help me say this with love to {contact_name} in our {context} relationship:"
+        
+        # AI API call - keep existing logic
+        models = [
+            "google/gemma-2-9b-it:free",
+            "meta-llama/llama-3.2-3b-instruct:free", 
+            "microsoft/phi-3-mini-128k-instruct:free"
+        ]
+        
+        for model in models:
+            try:
+                messages = [
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": message}
+                ]
                 
-                except Exception as e:
-                    errors.append(f"Model {model} failed: {e}")
-            
-            if reply and used_model:
-                healing_score = min(10, len(reply.split()) // 10 + 5)
+                res = requests.post(
+                    API_URL,
+                    headers={"Authorization": f"Bearer {st.session_state.api_key}"},
+                    json={"model": model, "messages": messages, "temperature": 0.7}
+                )
                 
+                res.raise_for_status()
+                reply = res.json()["choices"][0]["message"]["content"]
+                
+                # Display result
                 st.markdown(f"""
-                <div class="healing-message">
-                    <h4>💝 Your Third Voice Response:</h4>
+                <div class="ai-intervention">
+                    <h4>💝 Your Third Voice Guidance:</h4>
                     <p>{reply}</p>
-                    <p><em>Generated by: {used_model}</em></p>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Save to history
+                # Save message - keep existing logic
+                healing_score = min(10, len(reply.split()) // 10 + 5)
                 new_entry = {
                     "id": f"{mode}_{datetime.datetime.now().timestamp()}",
                     "time": datetime.datetime.now().strftime("%m/%d %H:%M"),
@@ -513,71 +557,50 @@ The situation:"""
                     "result": reply,
                     "sentiment": "healing",
                     "emotional_state": st.session_state.current_emotional_state,
-                    "model": used_model,
+                    "model": model,
                     "healing_score": healing_score
                 }
                 
                 st.session_state.contacts[contact_name]['history'].append(new_entry)
-                save_message(contact_name, mode, message, reply, "healing", st.session_state.current_emotional_state, used_model, healing_score)
+                save_message(contact_name, mode, message, reply, "healing", st.session_state.current_emotional_state, model, healing_score)
                 
                 if healing_score > 7:
                     st.success("🌟 This feels like a breakthrough moment!")
+                    st.balloons()
                 
-                # Action buttons
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("💬 Continue This Conversation"):
-                        st.session_state.active_mode = None
-                        st.rerun()
-                with col2:
-                    if st.button("📱 Ready to Send"):
-                        st.session_state.active_mode = None
-                        st.balloons()
-                        st.success("🕊️ Go forth with love. You've got this.")
-                        time.sleep(2)
-                        st.rerun()
-            else:
-                st.error("💔 All models failed to respond.")
-                for error in errors:
-                    st.write(f"• {error}")
+                break
+                
+            except Exception as e:
+                continue
+        else:
+            st.error("Unable to connect to AI services. Please try again.")
 
-render_message_area()
+# Quick add contact (mobile optimized)
+def render_quick_add():
+    if not st.session_state.active_contact:
+        with st.expander("➕ Add New Contact", expanded=False, key="add_contact_expander"):
+            st.markdown("**Who would you like to heal conversations with?**")
+            
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                new_name = st.text_input("Name", placeholder="Sarah, Mom, Dad, etc.", key="new_contact_name")
+            with col2:
+                new_context = st.selectbox("Type", list(CONTEXTS.keys()), key="new_contact_context")
+            
+            if st.button("✨ Add Contact", use_container_width=True) and new_name.strip():
+                if save_contact(new_name.strip(), new_context):
+                    st.session_state.contacts[new_name.strip()] = {
+                        "context": new_context,
+                        "history": [],
+                        "emotional_journey": [],
+                        "breakthrough_moments": [],
+                        "created_at": datetime.datetime.now().isoformat()
+                    }
+                    st.success(f"✨ Added {new_name.strip()}")
+                    time.sleep(1)
+                    st.rerun()
 
-# Enhanced History Display
-def render_history():
-    if st.session_state.active_mode or not st.session_state.active_contact:
-        return
-        
-    st.markdown("### 📖 Your Healing Journey")
-    st.markdown(f"*Conversation history with **{st.session_state.active_contact}***")
-    
-    contact = st.session_state.contacts[st.session_state.active_contact]
-    history = contact['history']
-    
-    if not history:
-        context_info = CONTEXTS.get(contact.get('context', 'family'), CONTEXTS['family'])
-        st.markdown(f"""
-        <div class="healing-message">
-            <p>{context_info['icon']} <strong>This is where your healing journey with {st.session_state.active_contact} begins.</strong></p>
-            <p>Every conversation is a step toward deeper connection. Every word matters. Every attempt at understanding builds bridges.</p>
-            <p><em>You're exactly where you need to be.</em></p>
-        </div>
-        """, unsafe_allow_html=True)
-        return
-    
-    # Show conversation stats
-    healing_moments = len([h for h in history if h.get('healing_score', 0) > 7])
-    st.markdown(f"**{len(history)} conversations • {healing_moments} breakthrough moments**")
-    
-    # Display history
-    for entry in reversed(history[-10:]):  # Show last 10 entries
-        mode_icons = {"coach": "🤲", "translate": "💝", "mediate": "🕊️"}
-        mode_titles = {"coach": "Refined Message", "translate": "Heart Translation", "mediate": "Peace Path"}
-        
-        with st.expander(f"{mode_icons.get(entry['type'], '💬')} {mode_titles.get(entry['type'], entry['type'].title())} - {entry['time']}"):
-            st.markdown(f"**Original:** {entry['original']}")
-            st.markdown(f"**Response:** {entry['result']}")
-            if entry.get('healing_score', 0) > 7:
-                st.markdown("⭐ *Breakthrough moment*")
-
-render_history()
+# Main app flow
+render_contact_list()
+render_conversation() 
+render_quick_add()
