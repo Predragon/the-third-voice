@@ -240,7 +240,7 @@ def render_first_time_screen():
                 st.session_state.page = "conversation"
                 st.rerun()
 
-# Contact list with integrated edit/delete
+# Contact list (simplified without edit/delete buttons)
 def render_contact_list():
     if st.session_state.page != "contacts":
         return
@@ -255,51 +255,24 @@ def render_contact_list():
         preview = f"{last_msg['original'][:30]}..." if last_msg else "Start chatting!"
         time = last_msg["time"] if last_msg else "New"
         
-        with st.container():
-            col1, col2 = st.columns([4, 1])
-            
-            with col1:
-                if st.button(
-                    f"**{context['icon']} {name}**  \n"
-                    f"{context['description']} • {time}  \n"
-                    f"`{preview}`",
-                    key=f"contact_{name}",
-                    use_container_width=True
-                ):
-                    st.session_state.active_contact = name
-                    st.session_state.page = "conversation"
-                    st.rerun()
-            
-            with col2:
-                btn_col1, btn_col2 = st.columns(2)
-                
-                with btn_col1:
-                    if st.button("✏️", 
-                                key=f"edit_{name}",
-                                help=f"Edit {name}"):
-                        st.session_state.edit_contact = {
-                            "id": data["id"],
-                            "name": name,
-                            "context": data["context"]
-                        }
-                        st.session_state.page = "edit_contact"
-                        st.rerun()
-                
-                with btn_col2:
-                    if st.button("🗑️", 
-                                key=f"delete_{name}",
-                                help=f"Delete {name}"):
-                        if delete_contact(data["id"]):
-                            st.success(f"Deleted contact: {name}")
-                            st.rerun()
-            
-            st.markdown("---")
+        if st.button(
+            f"**{context['icon']} {name}**  \n"
+            f"{context['description']} • {time}  \n"
+            f"`{preview}`",
+            key=f"contact_{name}",
+            use_container_width=True
+        ):
+            st.session_state.active_contact = name
+            st.session_state.page = "conversation"
+            st.rerun()
+        
+        st.markdown("---")
     
     if st.button("➕ Add New Contact", use_container_width=True):
         st.session_state.page = "add_contact"
         st.rerun()
 
-# Edit contact page
+# Edit contact page with delete option
 def render_edit_contact():
     if st.session_state.page != "edit_contact" or not st.session_state.edit_contact:
         return
@@ -307,8 +280,8 @@ def render_edit_contact():
     contact = st.session_state.edit_contact
     st.markdown(f"### ✏️ Edit Contact: {contact['name']}")
     
-    if st.button("← Back to Contacts", key="back_to_contacts_edit", use_container_width=True):
-        st.session_state.page = "contacts"
+    if st.button("← Back", key="back_to_conversation", use_container_width=True):
+        st.session_state.page = "conversation"
         st.session_state.edit_contact = None
         st.rerun()
     
@@ -318,14 +291,24 @@ def render_edit_contact():
                              index=list(CONTEXTS.keys()).index(contact["context"]),
                              format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}")
         
-        if st.form_submit_button("Save Changes"):
-            if name.strip() and save_contact(name, context, contact["id"]):
-                st.success(f"Updated {name}")
-                st.session_state.page = "contacts"
-                st.session_state.edit_contact = None
-                st.rerun()
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.form_submit_button("💾 Save Changes"):
+                if name.strip() and save_contact(name, context, contact["id"]):
+                    st.success(f"Updated {name}")
+                    st.session_state.page = "conversation"
+                    st.session_state.edit_contact = None
+                    st.rerun()
+        
+        with col2:
+            if st.form_submit_button("🗑️ Delete Contact"):
+                if delete_contact(contact["id"]):
+                    st.success(f"Deleted contact: {name}")
+                    st.session_state.page = "contacts"
+                    st.session_state.edit_contact = None
+                    st.rerun()
 
-# Conversation screen
+# Conversation screen with edit button
 def render_conversation():
     if st.session_state.page != "conversation" or not st.session_state.active_contact:
         return
