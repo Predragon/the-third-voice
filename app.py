@@ -100,7 +100,8 @@ def initialize_session():
         "page": "contacts", 
         "active_contact": None, 
         "current_emotional_state": "calm", 
-        "user_input": ""
+        "user_input": "",
+        "clear_input": False  # Add this flag for clearing input
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -175,6 +176,9 @@ def process_message(contact_name, message, context):
                 "healing_score": healing_score,
                 "timestamp": datetime.datetime.now().timestamp()
             }
+            
+            # Set flag to clear input on next render
+            st.session_state.clear_input = True
                 
         except Exception as e:
             st.error(f"Failed to process message: {e}")
@@ -313,13 +317,24 @@ def render_conversation():
                 if last_resp["healing_score"] >= 8:
                     st.info("✨ High healing score achieved!")
     
-    # Input area (removed emotional state selection for less friction)
+    # Input area - use dynamic key or value to handle clearing
+    input_value = "" if st.session_state.get("clear_input", False) else st.session_state.get("conversation_input_value", "")
+    
     user_input = st.text_area(
         "What's happening?", 
+        value=input_value,
         key="conversation_input", 
         placeholder="Share their message or your response...", 
         height=120
     )
+    
+    # Reset clear flag after rendering input
+    if st.session_state.get("clear_input", False):
+        st.session_state.clear_input = False
+        st.session_state.conversation_input_value = ""
+    else:
+        # Store the current input value
+        st.session_state.conversation_input_value = user_input
     
     col1, col2 = st.columns([3, 1])
     with col1:
@@ -331,12 +346,10 @@ def render_conversation():
                 del st.session_state[last_response_key]
             
             process_message(contact_name, user_input, context)
-            # Clear input after processing
-            st.session_state.conversation_input = ""
             st.rerun()
     with col2:
-        if st.button("🗑️ Clear", key="clear_input", use_container_width=True):
-            st.session_state.conversation_input = ""
+        if st.button("🗑️ Clear", key="clear_input_btn", use_container_width=True):
+            st.session_state.clear_input = True
             st.rerun()
 
 # Add contact page
