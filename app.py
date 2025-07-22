@@ -12,8 +12,6 @@ CONTEXTS = {
     "friend": {"icon": "🤝", "description": "Friendships & social bonds"}
 }
 
-
-
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODEL = "google/gemma-2-9b-it:free"
 
@@ -35,7 +33,10 @@ def load_contacts_and_history():
         return {}
     try:
         contacts_data = {c["name"]: {
-            "context": c["context"], "history": [], "created_at": c.get("created_at", datetime.datetime.now().isoformat())
+            "context": c["context"], 
+            "history": [], 
+            "created_at": c.get("created_at", datetime.datetime.now().isoformat()),
+            "id": c.get("id")  # Add contact ID for editing/deleting
         } for c in supabase.table("contacts").select("*").execute().data}
         
         # Load messages and group by contact
@@ -43,7 +44,12 @@ def load_contacts_and_history():
         for msg in messages:
             contact_name = msg["contact_name"]
             if contact_name not in contacts_data:
-                contacts_data[contact_name] = {"context": "family", "history": [], "created_at": datetime.datetime.now().isoformat()}
+                contacts_data[contact_name] = {
+                    "context": "family", 
+                    "history": [], 
+                    "created_at": datetime.datetime.now().isoformat(),
+                    "id": None
+                }
             contacts_data[contact_name]["history"].append({
                 "id": f"{msg['type']}_{msg['timestamp']}",
                 "time": datetime.datetime.fromisoformat(msg["timestamp"]).strftime("%m/%d %H:%M"),
@@ -58,15 +64,38 @@ def load_contacts_and_history():
         return {}
 
 # Save data
-def save_contact(name, context):
+def save_contact(name, context, contact_id=None):
     if not supabase or not name.strip():
         return False
     try:
-        supabase.table("contacts").insert({"name": name, "context": context, "created_at": datetime.datetime.now().isoformat()}).execute()
+        contact_data = {"name": name, "context": context}
+        if contact_id:
+            # Update existing contact
+            supabase.table("contacts").update(contact_data).eq("id", contact_id).execute()
+        else:
+            # Create new contact
+            contact_data["created_at"] = datetime.datetime.now().isoformat()
+            supabase.table("contacts").insert(contact_data).execute()
         st.cache_data.clear()
         return True
     except Exception as e:
         st.error(f"Error saving contact: {e}")
+        return False
+
+def delete_contact(contact_id):
+    if not supabase or not contact_id:
+        return False
+    try:
+        # First delete all messages associated with this contact
+        contact_name = supabase.table("contacts").select("name").eq("id", contact_id).execute().data[0]["name"]
+        supabase.table("messages").delete().eq("contact_name", contact_name).execute()
+        
+        # Then delete the contact
+        supabase.table("contacts").delete().eq("id", contact_id).execute()
+        st.cache_data.clear()
+        return True
+    except Exception as e:
+        st.error(f"Error deleting contact: {e}")
         return False
 
 def save_message(contact, message_type, original, result, emotional_state, healing_score):
@@ -90,7 +119,8 @@ def initialize_session():
         "page": "contacts", 
         "active_contact": None, 
         "user_input": "",
-        "clear_input": False
+        "clear_input": False,
+        "edit_contact": None  # Track which contact is being edited
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -143,7 +173,12 @@ def process_message(contact_name, message, context):
             }
             
             if contact_name not in st.session_state.contacts:
-                st.session_state.contacts[contact_name] = {"context": "family", "history": [], "created_at": datetime.datetime.now().isoformat()}
+                st.session_state.contacts[contact_name] = {
+                    "context": "family", 
+                    "history": [], 
+                    "created_at": datetime.datetime.now().isoformat(),
+                    "id": None
+                }
             
             st.session_state.contacts[contact_name]["history"].append(new_message)
             
@@ -195,7 +230,8 @@ def render_first_time_screen():
                     st.session_state.contacts[contact_name] = {
                         "context": context_key, 
                         "history": [], 
-                        "created_at": datetime.datetime.now().isoformat()
+                        "created_at": datetime.datetime.now().isoformat(),
+                        "id": None
                     }
                     st.session_state.active_contact = contact_name
                     st.session_state.page = "conversation"
@@ -214,7 +250,8 @@ def render_first_time_screen():
                 st.session_state.contacts[name] = {
                     "context": context, 
                     "history": [], 
-                    "created_at": datetime.datetime.now().isoformat()
+                    "created_at": datetime.datetime.now().isoformat(),
+                    "id": None
                 }
                 st.session_state.active_contact = name
                 st.session_state.page = "conversation"
@@ -234,13 +271,37 @@ def render_contact_list():
         preview = f"{last_msg['original'][:30]}..." if last_msg else "Start chatting!"
         time = last_msg["time"] if last_msg else "New"
         
-        # Merge contact info into the button itself
-        button_text = f"{context['icon']} {name}\n{context['description']} • {time}\n{preview}"
+        # Create columns for the contact button and edit/delete buttons
+        col1, col2 = st.columns([4, 1])
         
-        if st.button(button_text, key=f"contact_{name}", use_container_width=True):
-            st.session_state.active_contact = name
-            st.session_state.page = "conversation"
-            st.rerun()
+        with col1:
+            # Merge contact info into the button itself
+            button_text = f"{context['icon']} {name}\n{context['description']} • {time}\n{preview}"
+            
+            if st.button(button_text, key=f"contact_{name}", use_container_width=True):
+                st.session_state.active_contact = name
+                st.session_state.page = "conversation"
+                st.rerun()
+        
+        with col2:
+            # Edit and delete buttons
+            edit_col, delete_col = st.columns(2)
+            
+            with edit_col:
+                if st.button("✏️", key=f"edit_{name}", help="Edit contact"):
+                    st.session_state.edit_contact = {
+                        "id": data["id"],
+                        "name": name,
+                        "context": data["context"]
+                    }
+                    st.session_state.page = "edit_contact"
+                    st.rerun()
+            
+            with delete_col:
+                if st.button("🗑️", key=f"delete_{name}", help="Delete contact"):
+                    if delete_contact(data["id"]):
+                        st.success(f"Deleted contact: {name}")
+                        st.rerun()
     
     # Add new contact button
     st.markdown("---")
@@ -248,22 +309,63 @@ def render_contact_list():
         st.session_state.page = "add_contact"
         st.rerun()
 
+# Edit contact page
+def render_edit_contact():
+    if st.session_state.page != "edit_contact" or not st.session_state.edit_contact:
+        return
+        
+    contact = st.session_state.edit_contact
+    st.markdown(f"### ✏️ Edit Contact: {contact['name']}")
+    
+    if st.button("← Back to Contacts", key="back_to_contacts_edit", use_container_width=True):
+        st.session_state.page = "contacts"
+        st.session_state.edit_contact = None
+        st.rerun()
+    
+    with st.form("edit_contact_form"):
+        name = st.text_input("Name", value=contact["name"], placeholder="Sarah, Mom, Dad...")
+        context = st.selectbox("Relationship", list(CONTEXTS.keys()), 
+                             index=list(CONTEXTS.keys()).index(contact["context"]),
+                             format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}")
+        
+        if st.form_submit_button("Save Changes"):
+            if name.strip() and save_contact(name, context, contact["id"]):
+                st.success(f"Updated {name}")
+                st.session_state.page = "contacts"
+                st.session_state.edit_contact = None
+                st.rerun()
+
 # Conversation screen (improved UI layout)
 def render_conversation():
     if st.session_state.page != "conversation" or not st.session_state.active_contact:
         return
     
     contact_name = st.session_state.active_contact
-    contact_data = st.session_state.contacts.get(contact_name, {"context": "family", "history": []})
+    contact_data = st.session_state.contacts.get(contact_name, {"context": "family", "history": [], "id": None})
     context = contact_data["context"]
     history = contact_data["history"]
+    contact_id = contact_data.get("id")
     
     st.markdown(f"### {CONTEXTS[context]['icon']} {contact_name} - {CONTEXTS[context]['description']}")
     
-    if st.button("← Back", key="back_btn", use_container_width=True):
-        st.session_state.page = "contacts"
-        st.session_state.active_contact = None
-        st.rerun()
+    # Back and edit buttons in same row
+    back_col, edit_col, _ = st.columns([2, 2, 6])
+    
+    with back_col:
+        if st.button("← Back", key="back_btn", use_container_width=True):
+            st.session_state.page = "contacts"
+            st.session_state.active_contact = None
+            st.rerun()
+    
+    with edit_col:
+        if st.button("✏️ Edit", key="edit_current_contact", use_container_width=True):
+            st.session_state.edit_contact = {
+                "id": contact_id,
+                "name": contact_name,
+                "context": context
+            }
+            st.session_state.page = "edit_contact"
+            st.rerun()
     
     st.markdown("---")
     
@@ -402,7 +504,8 @@ def render_add_contact():
                 st.session_state.contacts[name] = {
                     "context": context, 
                     "history": [], 
-                    "created_at": datetime.datetime.now().isoformat()
+                    "created_at": datetime.datetime.now().isoformat(),
+                    "id": None
                 }
                 st.success(f"Added {name}")
                 st.session_state.page = "contacts"
@@ -417,7 +520,10 @@ def main():
     if not st.session_state.contacts:
         render_first_time_screen()
     else:
-        render_contact_list()
+        if st.session_state.page == "edit_contact":
+            render_edit_contact()
+        else:
+            render_contact_list()
     
     render_conversation()
     render_add_contact()
