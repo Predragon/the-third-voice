@@ -3,7 +3,7 @@ import datetime
 import requests
 from supabase import create_client
 
-# Constants (removed teen category)
+# Constants
 CONTEXTS = {
     "romantic": {"icon": "💕", "description": "Partner & intimate relationships"},
     "coparenting": {"icon": "👨‍👩‍👧‍👦", "description": "Raising children together"},
@@ -36,10 +36,9 @@ def load_contacts_and_history():
             "context": c["context"], 
             "history": [], 
             "created_at": c.get("created_at", datetime.datetime.now().isoformat()),
-            "id": c.get("id")  # Add contact ID for editing/deleting
+            "id": c.get("id")
         } for c in supabase.table("contacts").select("*").execute().data}
         
-        # Load messages and group by contact
         messages = supabase.table("messages").select("*").order("timestamp").execute().data
         for msg in messages:
             contact_name = msg["contact_name"]
@@ -70,10 +69,8 @@ def save_contact(name, context, contact_id=None):
     try:
         contact_data = {"name": name, "context": context}
         if contact_id:
-            # Update existing contact
             supabase.table("contacts").update(contact_data).eq("id", contact_id).execute()
         else:
-            # Create new contact
             contact_data["created_at"] = datetime.datetime.now().isoformat()
             supabase.table("contacts").insert(contact_data).execute()
         st.cache_data.clear()
@@ -86,11 +83,8 @@ def delete_contact(contact_id):
     if not supabase or not contact_id:
         return False
     try:
-        # First delete all messages associated with this contact
         contact_name = supabase.table("contacts").select("name").eq("id", contact_id).execute().data[0]["name"]
         supabase.table("messages").delete().eq("contact_name", contact_name).execute()
-        
-        # Then delete the contact
         supabase.table("contacts").delete().eq("id", contact_id).execute()
         st.cache_data.clear()
         return True
@@ -120,7 +114,7 @@ def initialize_session():
         "active_contact": None, 
         "user_input": "",
         "clear_input": False,
-        "edit_contact": None  # Track which contact is being edited
+        "edit_contact": None
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -162,7 +156,6 @@ def process_message(contact_name, message, context):
             healing_score = 5 + (1 if len(response) > 200 else 0) + min(2, sum(1 for word in ["understand", "love", "connect", "care"] if word in response.lower()))
             healing_score = min(10, healing_score)
             
-            # Add to session state history immediately
             new_message = {
                 "id": f"{mode}_{datetime.datetime.now().timestamp()}", 
                 "time": datetime.datetime.now().strftime("%m/%d %H:%M"),
@@ -181,30 +174,23 @@ def process_message(contact_name, message, context):
                 }
             
             st.session_state.contacts[contact_name]["history"].append(new_message)
-            
-            # Save to database (with empty emotional_state for compatibility)
             save_message(contact_name, mode, message, response, "calm", healing_score)
-            
-            # Store the response in session state to persist across reruns
             st.session_state[f"last_response_{contact_name}"] = {
                 "response": response,
                 "healing_score": healing_score,
                 "timestamp": datetime.datetime.now().timestamp(),
                 "model": MODEL
             }
-            
-            # Set flag to clear input on next render
             st.session_state.clear_input = True
                 
         except Exception as e:
             st.error(f"Failed to process message: {e}")
 
-# First time user screen - context buttons as default contacts
+# First time user screen
 def render_first_time_screen():
     st.markdown("### 🎙️ Welcome to The Third Voice")
     st.markdown("Choose a relationship type to get started, or add a custom contact:")
     
-    # Context buttons as starter contacts
     cols = st.columns(2)
     contexts = list(CONTEXTS.items())
     
@@ -215,7 +201,6 @@ def render_first_time_screen():
                 key=f"context_{context_key}",
                 use_container_width=True
             ):
-                # Create a default contact name based on context
                 default_names = {
                     "romantic": "Partner",
                     "coparenting": "Co-parent",
@@ -225,7 +210,6 @@ def render_first_time_screen():
                 }
                 contact_name = default_names.get(context_key, context_key.title())
                 
-                # Save and activate this contact
                 if save_contact(contact_name, context_key):
                     st.session_state.contacts[contact_name] = {
                         "context": context_key, 
@@ -239,7 +223,6 @@ def render_first_time_screen():
     
     st.markdown("---")
     
-    # Add custom contact option
     with st.form("add_custom_contact"):
         st.markdown("**Or add a custom contact:**")
         name = st.text_input("Name", placeholder="Sarah, Mom, Dad...")
@@ -257,14 +240,13 @@ def render_first_time_screen():
                 st.session_state.page = "conversation"
                 st.rerun()
 
-# Contact list for existing users
+# Contact list with integrated edit/delete
 def render_contact_list():
     if st.session_state.page != "contacts":
         return
         
     st.markdown("### 🎙️ The Third Voice")
     
-    # Show existing contacts
     for name, data in sorted(st.session_state.contacts.items(), 
                            key=lambda x: x[1]["history"][-1]["time"] if x[1]["history"] else x[1]["created_at"], 
                            reverse=True):
@@ -273,13 +255,10 @@ def render_contact_list():
         preview = f"{last_msg['original'][:30]}..." if last_msg else "Start chatting!"
         time = last_msg["time"] if last_msg else "New"
         
-        # Create a container for each contact card
         with st.container():
             col1, col2 = st.columns([4, 1])
             
-            # Main contact info (clickable area)
             with col1:
-                # Use a button to make the whole area clickable
                 if st.button(
                     f"**{context['icon']} {name}**  \n"
                     f"{context['description']} • {time}  \n"
@@ -291,7 +270,6 @@ def render_contact_list():
                     st.session_state.page = "conversation"
                     st.rerun()
             
-            # Edit and delete buttons
             with col2:
                 btn_col1, btn_col2 = st.columns(2)
                 
@@ -315,47 +293,8 @@ def render_contact_list():
                             st.success(f"Deleted contact: {name}")
                             st.rerun()
             
-            st.markdown("---")  # Divider between contacts
+            st.markdown("---")
     
-    # Add new contact button
-    if st.button("➕ Add New Contact", use_container_width=True):
-        st.session_state.page = "add_contact"
-        st.rerun()
-        
-        # Create columns for the contact button and edit/delete buttons
-        col1, col2 = st.columns([4, 1])
-        
-        with col1:
-            # Merge contact info into the button itself
-            button_text = f"{context['icon']} {name}\n{context['description']} • {time}\n{preview}"
-            
-            if st.button(button_text, key=f"contact_{name}", use_container_width=True):
-                st.session_state.active_contact = name
-                st.session_state.page = "conversation"
-                st.rerun()
-        
-        with col2:
-            # Edit and delete buttons
-            edit_col, delete_col = st.columns(2)
-            
-            with edit_col:
-                if st.button("✏️", key=f"edit_{name}", help="Edit contact"):
-                    st.session_state.edit_contact = {
-                        "id": data["id"],
-                        "name": name,
-                        "context": data["context"]
-                    }
-                    st.session_state.page = "edit_contact"
-                    st.rerun()
-            
-            with delete_col:
-                if st.button("🗑️", key=f"delete_{name}", help="Delete contact"):
-                    if delete_contact(data["id"]):
-                        st.success(f"Deleted contact: {name}")
-                        st.rerun()
-    
-    # Add new contact button
-    st.markdown("---")
     if st.button("➕ Add New Contact", use_container_width=True):
         st.session_state.page = "add_contact"
         st.rerun()
@@ -386,7 +325,7 @@ def render_edit_contact():
                 st.session_state.edit_contact = None
                 st.rerun()
 
-# Conversation screen (improved UI layout)
+# Conversation screen
 def render_conversation():
     if st.session_state.page != "conversation" or not st.session_state.active_contact:
         return
@@ -399,7 +338,6 @@ def render_conversation():
     
     st.markdown(f"### {CONTEXTS[context]['icon']} {contact_name} - {CONTEXTS[context]['description']}")
     
-    # Back and edit buttons in same row
     back_col, edit_col, _ = st.columns([2, 2, 6])
     
     with back_col:
@@ -419,8 +357,6 @@ def render_conversation():
             st.rerun()
     
     st.markdown("---")
-    
-    # INPUT SECTION - Moved to top
     st.markdown("#### 💭 Your Input")
     input_value = "" if st.session_state.get("clear_input", False) else st.session_state.get("conversation_input_value", "")
     
@@ -432,23 +368,19 @@ def render_conversation():
         height=120
     )
     
-    # Reset clear flag after rendering input
     if st.session_state.get("clear_input", False):
         st.session_state.clear_input = False
         st.session_state.conversation_input_value = ""
     else:
-        # Store the current input value
         st.session_state.conversation_input_value = user_input
     
     col1, col2 = st.columns([3, 1])
     with col1:
         if st.button("✨ Transform", key="transform_message", 
                     disabled=not user_input.strip(), use_container_width=True):
-            # Clear the previous response before processing new one
             last_response_key = f"last_response_{contact_name}"
             if last_response_key in st.session_state:
                 del st.session_state[last_response_key]
-            
             process_message(contact_name, user_input, context)
             st.rerun()
     with col2:
@@ -456,19 +388,14 @@ def render_conversation():
             st.session_state.clear_input = True
             st.rerun()
     
-    # AI RESPONSE SECTION - Below input, above history
     st.markdown("---")
     st.markdown("#### 🤖 AI Response")
     
-    # Show last AI response if it exists
     last_response_key = f"last_response_{contact_name}"
     if last_response_key in st.session_state:
         last_resp = st.session_state[last_response_key]
-        # Only show if it's recent (within last 60 seconds to avoid stale responses)
         if datetime.datetime.now().timestamp() - last_resp["timestamp"] < 60:
-            # Create a container with better styling for copy-paste
             with st.container():
-                # Main response with proper text wrapping
                 st.markdown("**AI Guidance:**")
                 st.text_area(
                     "", 
@@ -479,7 +406,6 @@ def render_conversation():
                     disabled=False
                 )
                 
-                # Additional info below
                 col_score, col_model = st.columns([1, 1])
                 with col_score:
                     if last_resp["healing_score"] >= 8:
@@ -490,7 +416,6 @@ def render_conversation():
                 with col_model:
                     st.caption(f"🤖 Model: {last_resp.get('model', MODEL)}")
                 
-                # Show balloons for high healing scores
                 if last_resp["healing_score"] >= 8:
                     st.balloons()
         else:
@@ -498,28 +423,22 @@ def render_conversation():
     else:
         st.info("💭 Your AI response will appear here after you click Transform")
     
-    # CONVERSATION HISTORY - Moved below input and response
     st.markdown("---")
     st.markdown("#### 📜 Conversation History")
     
     if history:
         st.markdown(f"**Recent Messages** ({len(history)} total)")
         
-        # Show messages in a more compact format
         with st.expander("View Chat History", expanded=False):
-            for msg in reversed(history[-10:]):  # Show last 10 messages
-                
-                # More compact message display
+            for msg in reversed(history[-10:]):
                 st.markdown(f"""
                 **{msg['time']}** | **{msg['type'].title()}** | Score: {msg['healing_score']}/10
                 """)
                 
-                # Your message in a quote block
                 with st.container():
                     st.markdown("**Your Message:**")
                     st.info(msg['original'])
                 
-                # AI response in text area for easy copying and proper wrapping
                 with st.container():
                     st.markdown("**AI Guidance:**")
                     st.text_area(
@@ -567,7 +486,6 @@ def main():
     st.set_page_config(page_title="The Third Voice", layout="wide")
     initialize_session()
     
-    # Show first time screen if no contacts, otherwise show contact list
     if not st.session_state.contacts:
         render_first_time_screen()
     else:
