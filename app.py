@@ -1,187 +1,220 @@
 import streamlit as st
+from supabase import create_client, Client
+import requests
 import json
 import datetime
-import requests
-from supabase import create_client
-from uuid import uuid4
+import uuid
 
-# --- Configuration ---
-CONTEXTS = ["romantic", "coparenting", "workplace", "family", "friend"]
-API_URL = "https://openrouter.ai/api/v1/chat/completions"
-DEFAULT_MODEL = "google/gemma-2-9b-it:free"
-MODELS = st.secrets["openrouter"]["models"]
+# ✅ Demo user fallback UUID (replace with real auth ID if available)
+DEMO_USER_ID = "12345678-1234-1234-1234-123456789abc"
+
+# ✅ Load secrets
+SUPABASE_URL = st.secrets["supabase"]["url"]
+SUPABASE_KEY = st.secrets["supabase"]["key"]
 API_KEY = st.secrets["openrouter"]["api_key"]
+API_URL = st.secrets["openrouter"].get("api_url", "https://openrouter.ai/api/v1/chat/completions")
+AI_MODELS = json.loads(st.secrets["openrouter"]["models"])
 
-# --- Supabase ---
-supabase_url = st.secrets["supabase"]["url"]
-supabase_key = st.secrets["supabase"]["key"]
-supabase = create_client(supabase_url, supabase_key)
+# ✅ Supabase connection
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+st.success("Connected to Supabase successfully!")
 
-# --- Initialize Session ---
-def initialize_session():
-    st.session_state.setdefault("contacts", load_contacts())
-    if st.session_state["contacts"]:
-        st.session_state.setdefault("active_contact", list(st.session_state["contacts"].keys())[0])
-    st.session_state.setdefault("journal_entries", {})
-    st.session_state.setdefault("feedback_data", {})
-    st.session_state.setdefault("active_mode", "coach")
-    st.session_state.setdefault("input_text", "")
-
-def load_contacts():
+# --- Load contacts & messages from Supabase ---
+def load_supabase_history(user_id):
     try:
-        data = supabase.table("contacts").select("*").eq("user_id", get_user_id()).execute().data
+        response = (
+            supabase.table("messages")
+            .select("*")
+            .eq("user_id", user_id)
+            .order("timestamp")
+            .execute()
+        )
+        messages = response.data
         contacts = {}
-        for row in data:
-            name = row["name"]
-            contacts[name] = {"context": row.get("context", "family"), "created_at": row["created_at"], "history": []}
-        # Load messages
-        messages = supabase.table("messages").select("*").eq("user_id", get_user_id()).execute().data
+
         for msg in messages:
-            contact = msg["contact_name"]
-            if contact in contacts:
-                contacts[contact]["history"].append(msg)
+            name = msg["contact_name"]
+            if name not in contacts:
+                contacts[name] = {
+                    "context": msg.get("context", "family"),
+                    "history": []
+                }
+
+            contacts[name]["history"].append({
+                "id": f"{msg['type']}_{msg['timestamp']}",
+                "time": datetime.datetime.fromisoformat(msg["timestamp"]).strftime("%m/%d %H:%M"),
+                "type": msg["type"],
+                "original": msg["original"],
+                "result": msg["result"],
+                "sentiment": msg["sentiment"],
+                "model": msg["model"]
+            })
+
         return contacts
+
     except Exception as e:
-        st.warning(f"⚠️ Couldn't load contacts: {e}")
+        st.warning(f"⚠️ Could not load history from Supabase: {e}")
         return {}
 
-def get_user_id():
-    # Placeholder: Replace with actual auth.uid() from Supabase session if needed
-    return st.secrets.get("supabase_user_id", "demo-user-1234")
+# --- Initialize session state ---
+def initialize_session():
+    contacts = load_supabase_history(DEMO_USER_ID)
 
-initialize_session()
+    defaults = {
+        "token_validated": True,
+        "api_key": API_KEY,
+        "models": AI_MODELS,
+        "contacts": contacts,
+        "user_id": DEMO_USER_ID,
+        "active_contact": None,
+        "journal_entries": {},
+        "feedback_data": {},
+        "user_stats": {
+            "total_messages": 0,
+            "coached_messages": 0,
+            "translated_messages": 0
+        },
+        "active_mode": None
+    }
 
-# --- Sidebar ---
-def contact_sidebar():
-    st.sidebar.title("👥 Contacts")
-    with st.sidebar.expander("➕ Add Contact"):
-        new_name = st.text_input("Name")
-        new_context = st.selectbox("Context", CONTEXTS, key="context_select")
-        if st.button("Add") and new_name:
-            if new_name not in st.session_state.contacts:
-                # Save to Supabase
-                supabase.table("contacts").insert({
-                    "id": str(uuid4()),
-                    "name": new_name,
-                    "context": new_context,
-                    "user_id": get_user_id()
-                }).execute()
-                st.session_state.contacts[new_name] = {"context": new_context, "history": []}
-                st.session_state.active_contact = new_name
-                st.success(f"Added {new_name}")
-                st.rerun()
-            else:
-                st.warning("Contact already exists")
+    for key, value in defaults.items():
+        st.session_state.setdefault(key, value)
 
-    options = list(st.session_state.contacts.keys())
-    if options:
-        selected = st.sidebar.selectbox("Select", options, index=options.index(st.session_state.active_contact))
-        st.session_state.active_contact = selected
+    # Set default contact if available
+    if not st.session_state.active_contact and contacts:
+        st.session_state.active_contact = list(contacts.keys())[0]
 
-contact_sidebar()
+# --- Save message to Supabase ---
+def save_message(contact_name, msg_type, original, result, model, sentiment, context, emotional_state):
+    try:
+        supabase.table("messages").insert({
+            "contact_name": contact_name,
+            "type": msg_type,
+            "original": original,
+            "result": result,
+            "model": model,
+            "sentiment": sentiment,
+            "context": context,
+            "user_id": st.session_state.user_id,
+            "emotional_state": emotional_state,
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }).execute()
+    except Exception as e:
+        st.warning(f"Could not save message: {e}")
 
-# --- AI Request ---
-def query_ai(model, contact_name, context, message, mode="coach"):
-    headers = {"Authorization": f"Bearer {API_KEY}"}
+# --- AI Message Request ---
+def call_ai_model(prompt, context, model_name):
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+
     payload = {
-        "model": model,
+        "model": model_name,
         "messages": [
-            {"role": "system", "content": f"You are a helpful assistant aiding with {context} communication."},
-            {"role": "user", "content": message}
+            {"role": "system", "content": context},
+            {"role": "user", "content": prompt}
         ]
     }
+
     try:
-        res = requests.post(API_URL, headers=headers, json=payload, timeout=30)
+        res = requests.post(API_URL, headers=headers, json=payload)
         res.raise_for_status()
-        result = res.json()["choices"][0]["message"]["content"]
-        return result
+        return res.json()["choices"][0]["message"]["content"]
     except Exception as e:
+        st.warning(f"Error with model {model_name}: {e}")
         return None
 
-def get_cached_response(contact_name, message, context, model):
-    try:
-        data = supabase.table("ai_response_cache").select("response").match({
-            "user_id": get_user_id(),
-            "contact_name": contact_name,
-            "message": message,
-            "model": model
-        }).limit(1).execute().data
-        return data[0]["response"] if data else None
-    except:
-        return None
-
-def cache_response(contact_name, message, context, response, model):
-    supabase.table("ai_response_cache").insert({
-        "id": str(uuid4()),
-        "user_id": get_user_id(),
-        "contact_name": contact_name,
-        "message": message,
-        "context": context,
-        "response": response,
-        "model": model
-    }).execute()
-
-# --- Main Logic ---
+# --- Main App Interface ---
 def render_main():
-    contact = st.session_state.active_contact
-    context = st.session_state.contacts[contact]["context"]
+    st.title("🎙️ The Third Voice — Emotional Intelligence Assistant")
 
-    st.title(f"🎙️ The Third Voice — {contact}")
-    st.caption(f"Relationship Context: *{context}*")
+    st.sidebar.header("👤 Contacts")
+    contacts = st.session_state.contacts
 
-    # Chat History
-    st.subheader("📜 Conversation History")
-    for msg in reversed(st.session_state.contacts[contact]["history"]):
-        with st.expander(f"[{msg['timestamp'][:16]}] {msg['type'].capitalize()}"):
-            st.markdown(f"**🧍 You:** {msg['original']}")
-            st.markdown(f"**🤖 AI:** {msg['result']}")
+    if contacts:
+        selected = st.sidebar.radio(
+            "Select contact",
+            list(contacts.keys()),
+            index=0 if not st.session_state.active_contact else list(contacts.keys()).index(st.session_state.active_contact)
+        )
+        st.session_state.active_contact = selected
+        contact = contacts[selected]
+    else:
+        st.sidebar.info("No contacts yet. Add one below.")
+        contact = None
 
-    st.subheader("💬 New Message")
-    input_text = st.text_area("What do you want help with?", key="input_text")
+    if st.sidebar.button("➕ Add Contact"):
+        with st.sidebar.form("new_contact"):
+            new_name = st.text_input("Contact Name")
+            new_context = st.text_area("Relationship Context", "family, friend, partner...")
+            submitted = st.form_submit_button("Add")
+            if submitted and new_name:
+                try:
+                    supabase.table("contacts").insert({
+                        "name": new_name,
+                        "context": new_context,
+                        "user_id": st.session_state.user_id
+                    }).execute()
+                    st.session_state.contacts[new_name] = {
+                        "context": new_context,
+                        "history": []
+                    }
+                    st.session_state.active_contact = new_name
+                    st.success(f"Contact {new_name} added.")
+                except Exception as e:
+                    st.error(f"Failed to add contact: {e}")
 
-    if st.button("Send") and input_text.strip():
-        model_used = None
-        response = None
+    if contact:
+        st.subheader(f"🧠 {st.session_state.active_contact} — {contact['context']}")
+        st.markdown("### 💬 Conversation History")
+        for msg in reversed(contact["history"][-10:]):
+            with st.expander(f"[{msg['time']}] {msg['type'].capitalize()}"):
+                st.markdown(f"**Original:** {msg['original']}")
+                st.markdown(f"**AI Response:** {msg['result']}")
+                st.caption(f"{msg['model']} | Sentiment: {msg['sentiment']}")
 
-        # Check cache or try models in order
-        for model in MODELS:
-            cached = get_cached_response(contact, input_text, context, model)
-            if cached:
-                response = cached
-                model_used = model
-                break
-            result = query_ai(model, contact, context, input_text)
-            if result:
-                response = result
-                model_used = model
-                cache_response(contact, input_text, context, response, model)
-                break
+        st.markdown("### ✍️ New Message")
+        with st.form("message_form"):
+            msg_type = st.selectbox("Type", ["coach", "translate", "mediate"])
+            original = st.text_area("Message")
+            submitted = st.form_submit_button("Send")
 
-        if response:
-            msg_id = str(uuid4())
-            now = datetime.datetime.now().isoformat()
-            supabase.table("messages").insert({
-                "id": msg_id,
-                "contact_name": contact,
-                "user_id": get_user_id(),
-                "type": "coach",
-                "original": input_text,
-                "result": response,
-                "timestamp": now,
-                "model": model_used
-            }).execute()
-            st.session_state.contacts[contact]["history"].append({
-                "id": msg_id,
-                "type": "coach",
-                "original": input_text,
-                "result": response,
-                "timestamp": now,
-                "model": model_used
-            })
-            st.success("✅ Response saved")
-            st.session_state.input_text = ""
-            st.rerun()
-        else:
-            st.error("❌ All models failed. Try again later.")
+            if submitted and original.strip():
+                context = contact["context"]
+                for model in AI_MODELS:
+                    result = call_ai_model(original, context, model)
+                    if result:
+                        break
 
+                if result:
+                    save_message(
+                        st.session_state.active_contact,
+                        msg_type,
+                        original,
+                        result,
+                        model,
+                        sentiment="neutral",
+                        context=context,
+                        emotional_state="unknown"
+                    )
+                    st.session_state.contacts[st.session_state.active_contact]["history"].append({
+                        "id": f"{msg_type}_{datetime.datetime.now().isoformat()}",
+                        "time": datetime.datetime.now().strftime("%m/%d %H:%M"),
+                        "type": msg_type,
+                        "original": original,
+                        "result": result,
+                        "sentiment": "neutral",
+                        "model": model
+                    })
+                    st.success("AI response added.")
+                    st.experimental_rerun()
+                else:
+                    st.error("All model attempts failed.")
+
+    else:
+        st.info("Welcome! Add or select a contact to begin.")
+
+# --- Run the app ---
+initialize_session()
 render_main()
