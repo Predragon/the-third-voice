@@ -44,10 +44,10 @@ def load_contacts_and_history():
             contact_name = msg["contact_name"]
             if contact_name not in contacts_data:
                 contacts_data[contact_name] = {
-                    "context": "family",
+                    "context": "family", # Default context if message exists but contact doesn't
                     "history": [],
                     "created_at": datetime.datetime.now().isoformat(),
-                    "id": None
+                    "id": None # Will need to be updated if contact is later saved
                 }
             contacts_data[contact_name]["history"].append({
                 "id": f"{msg['type']}_{msg['timestamp']}",
@@ -56,7 +56,7 @@ def load_contacts_and_history():
                 "original": msg["original"],
                 "result": msg["result"],
                 "healing_score": msg.get("healing_score", 0),
-                "model": msg.get("model", "Unknown") # Crucial: Store model name in history when loading
+                "model": msg.get("model", "Unknown")
             })
         return contacts_data
     except Exception as e:
@@ -84,8 +84,12 @@ def delete_contact(contact_id):
     if not supabase or not contact_id:
         return False
     try:
-        contact_name = supabase.table("contacts").select("name").eq("id", contact_id).execute().data[0]["name"]
-        supabase.table("messages").delete().eq("contact_name", contact_name).execute()
+        # Get contact name before deleting contact, to delete associated messages
+        contact_name_data = supabase.table("contacts").select("name").eq("id", contact_id).execute().data
+        if contact_name_data:
+            contact_name = contact_name_data[0]["name"]
+            supabase.table("messages").delete().eq("contact_name", contact_name).execute()
+
         supabase.table("contacts").delete().eq("id", contact_id).execute()
         st.cache_data.clear()
         return True
@@ -100,7 +104,7 @@ def save_message(contact, message_type, original, result, emotional_state, heali
         supabase.table("messages").insert({
             "contact_name": contact, "type": message_type, "original": original, "result": result,
             "emotional_state": emotional_state, "healing_score": healing_score,
-            "timestamp": datetime.datetime.now().isoformat(), "model": model_used # Save model name
+            "timestamp": datetime.datetime.now().isoformat(), "model": model_used
         }).execute()
         st.cache_data.clear()
         return True
@@ -119,7 +123,7 @@ def initialize_session():
         "edit_contact_name_input": "",
         "add_contact_name_input": "",
         "add_contact_context_select": list(CONTEXTS.keys())[0],
-        "last_error_message": None, # Key to store persistent error messages
+        "last_error_message": None,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -129,7 +133,7 @@ initialize_session()
 
 # Process message
 def process_message(contact_name, message, context):
-    st.session_state.last_error_message = None # Clear any previous error before attempting new process
+    st.session_state.last_error_message = None
 
     if not message.strip():
         st.session_state.last_error_message = "Input message cannot be empty. Please type something to transform."
@@ -158,7 +162,7 @@ def process_message(contact_name, message, context):
                     "temperature": 0.7,
                     "max_tokens": 500
                 },
-                timeout=25 # Increased timeout further for robustness
+                timeout=25
             ).json()["choices"][0]["message"]["content"].strip()
 
         healing_score = 5 + (1 if len(response) > 200 else 0) + min(2, sum(1 for word in ["understand", "love", "connect", "care"] if word in response.lower()))
@@ -171,7 +175,7 @@ def process_message(contact_name, message, context):
             "original": message,
             "result": response,
             "healing_score": healing_score,
-            "model": MODEL # Add model name to the new message
+            "model": MODEL
         }
 
         if contact_name not in st.session_state.contacts:
@@ -183,14 +187,14 @@ def process_message(contact_name, message, context):
             }
 
         st.session_state.contacts[contact_name]["history"].append(new_message)
-        save_message(contact_name, mode, message, response, "calm", healing_score, MODEL) # Pass MODEL to save_message
+        save_message(contact_name, mode, message, response, "calm", healing_score, MODEL)
         st.session_state[f"last_response_{contact_name}"] = {
             "response": response,
             "healing_score": healing_score,
             "timestamp": datetime.datetime.now().timestamp(),
-            "model": MODEL # Store model name in last_response for immediate display
+            "model": MODEL
         }
-        st.session_state.conversation_input_text = "" # Clear input after successful processing
+        # Do NOT clear conversation_input_text here. It will be cleared in render_conversation() after rerun.
 
     except requests.exceptions.Timeout:
         st.session_state.last_error_message = "API request timed out. Please try again. The AI might be busy."
@@ -198,7 +202,7 @@ def process_message(contact_name, message, context):
         st.session_state.last_error_message = "Connection error. Please check your internet connection."
     except requests.exceptions.RequestException as e:
         st.session_state.last_error_message = f"Network or API error: {e}. Please check your API key or connection."
-    except (KeyError, IndexError) as e: # Catching KeyError for json parsing issues and IndexError
+    except (KeyError, IndexError) as e:
         st.session_state.last_error_message = f"Received an unexpected response from the AI API. Error: {e}"
     except Exception as e:
         st.session_state.last_error_message = f"An unexpected error occurred: {e}"
@@ -227,37 +231,43 @@ def render_first_time_screen():
                 }
                 contact_name = default_names.get(context_key, context_key.title())
 
-                if save_contact(contact_name, context_key):
-                    st.session_state.contacts[contact_name] = {
-                        "context": context_key,
-                        "history": [],
-                        "created_at": datetime.datetime.now().isoformat(),
-                        "id": None
-                    }
+                # Check if contact already exists before saving to avoid duplicates in this flow
+                if contact_name not in st.session_state.contacts:
+                    if save_contact(contact_name, context_key):
+                        # Reload contacts to get the ID from Supabase for the newly added contact
+                        st.session_state.contacts = load_contacts_and_history()
+                        st.session_state.active_contact = contact_name
+                        st.session_state.page = "conversation"
+                        st.rerun()
+                else:
                     st.session_state.active_contact = contact_name
                     st.session_state.page = "conversation"
                     st.rerun()
 
+
     st.markdown("---")
 
-    with st.form("add_custom_contact_first_time"): # Changed key to avoid conflict
+    with st.form("add_custom_contact_first_time"):
         st.markdown("**Or add a custom contact:**")
-        name = st.text_input("Name", placeholder="Sarah, Mom, Dad...", key="first_time_new_contact_name_input") # Added key
-        context = st.selectbox("Relationship", list(CONTEXTS.keys()), format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}", key="first_time_new_contact_context_select") # Added key
+        name = st.text_input("Name", placeholder="Sarah, Mom, Dad...", key="first_time_new_contact_name_input")
+        context = st.selectbox("Relationship", list(CONTEXTS.keys()), format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}", key="first_time_new_contact_context_select")
 
         if st.form_submit_button("Add Custom Contact"):
             name_to_add = st.session_state.first_time_new_contact_name_input
             context_to_add = st.session_state.first_time_new_contact_context_select
-            if name_to_add.strip() and save_contact(name_to_add, context_to_add):
-                st.session_state.contacts[name_to_add] = {
-                    "context": context_to_add,
-                    "history": [],
-                    "created_at": datetime.datetime.now().isoformat(),
-                    "id": None
-                }
-                st.session_state.active_contact = name_to_add
-                st.session_state.page = "conversation"
-                st.rerun()
+            if name_to_add.strip():
+                if name_to_add not in st.session_state.contacts: # Prevent adding duplicate names
+                    if save_contact(name_to_add, context_to_add):
+                        st.session_state.contacts = load_contacts_and_history() # Reload to get ID
+                        st.session_state.active_contact = name_to_add
+                        st.session_state.page = "conversation"
+                        st.rerun()
+                    else:
+                        st.session_state.last_error_message = "Failed to add contact. Please try again."
+                else:
+                    st.session_state.last_error_message = "Contact with this name already exists."
+                    st.rerun() # Rerun to show the error message
+
 
 # Contact list
 def render_contact_list():
@@ -287,7 +297,7 @@ def render_contact_list():
             st.session_state.active_contact = name
             st.session_state.page = "conversation"
             st.session_state.conversation_input_text = ""
-            st.session_state.last_error_message = None # Clear error on page change
+            st.session_state.last_error_message = None
             st.rerun()
 
     st.markdown("---")
@@ -307,35 +317,65 @@ def render_edit_contact():
     if st.button("← Back", key="back_to_conversation", use_container_width=True):
         st.session_state.page = "conversation"
         st.session_state.edit_contact = None
-        st.session_state.last_error_message = None # Clear error on page change
+        st.session_state.last_error_message = None
         st.rerun()
 
-    if st.session_state.edit_contact_name_input == "" or st.session_state.edit_contact_name_input != contact["name"]:
+    # Initialize or reset the input field value when entering edit mode
+    # Check if the session state input is empty or doesn't match the current contact's name
+    # This prevents the input field from being reset if the user types something and then reruns
+    if "edit_contact_name_input" not in st.session_state or st.session_state.edit_contact_name_input == "":
         st.session_state.edit_contact_name_input = contact["name"]
+    elif st.session_state.edit_contact_name_input != contact["name"] and st.session_state.edit_contact_name_input == st.session_state.get('initial_edit_contact_name', ''):
+        # This handles cases where user navigates back and forth or a rerun occurs
+        st.session_state.edit_contact_name_input = contact["name"]
+
+    # Store initial name to detect changes later if needed
+    if 'initial_edit_contact_name' not in st.session_state:
+        st.session_state.initial_edit_contact_name = contact["name"]
+    elif st.session_state.initial_edit_contact_name != contact["name"]:
+        # If the active contact changed while on edit page, update initial value
+        st.session_state.initial_edit_contact_name = contact["name"]
+        st.session_state.edit_contact_name_input = contact["name"] # Also reset the input value
 
 
     with st.form("edit_contact_form"):
         name_input = st.text_input("Name",
                                    value=st.session_state.edit_contact_name_input,
-                                   key="edit_contact_name_input")
+                                   key="edit_contact_name_input_widget") # Changed key to avoid conflict
 
-        context = st.selectbox("Relationship", list(CONTEXTS.keys()),
-                             index=list(CONTEXTS.keys()).index(contact["context"]),
+        context_options = list(CONTEXTS.keys())
+        initial_context_index = context_options.index(contact["context"]) if contact["context"] in context_options else 0
+        context = st.selectbox("Relationship", context_options,
+                             index=initial_context_index,
                              format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}",
                              key="edit_contact_context_select")
 
         col1, col2 = st.columns(2)
         with col1:
             if st.form_submit_button("💾 Save Changes"):
-                new_name = st.session_state.edit_contact_name_input
+                new_name = st.session_state.edit_contact_name_input_widget # Get value from the widget's key
                 new_context = st.session_state.edit_contact_context_select
-                if new_name.strip() and save_contact(new_name, new_context, contact["id"]):
+
+                if not new_name.strip():
+                    st.error("Contact name cannot be empty.")
+                    st.rerun() # Rerun to display error and keep form state
+
+                # Check for duplicate name if name changed
+                if new_name != contact["name"] and new_name in st.session_state.contacts:
+                    st.error(f"Contact with name '{new_name}' already exists.")
+                    st.rerun()
+
+                if save_contact(new_name, new_context, contact["id"]):
                     st.success(f"Updated {new_name}")
+                    # Update active contact if the name changed
                     if st.session_state.active_contact == contact["name"]:
                         st.session_state.active_contact = new_name
                     st.session_state.page = "conversation"
                     st.session_state.edit_contact = None
-                    st.session_state.last_error_message = None # Clear error on successful save
+                    st.session_state.last_error_message = None
+                    # Clear edit_contact_name_input_widget for the next edit session
+                    st.session_state.edit_contact_name_input = ""
+                    st.session_state.initial_edit_contact_name = "" # Reset initial name
                     st.rerun()
 
         with col2:
@@ -345,7 +385,7 @@ def render_edit_contact():
                     st.session_state.page = "contacts"
                     st.session_state.active_contact = None
                     st.session_state.edit_contact = None
-                    st.session_state.last_error_message = None # Clear error on successful delete
+                    st.session_state.last_error_message = None
                     st.rerun()
 
 # Conversation screen with edit button
@@ -367,7 +407,7 @@ def render_conversation():
         if st.button("← Back", key="back_btn", use_container_width=True):
             st.session_state.page = "contacts"
             st.session_state.active_contact = None
-            st.session_state.last_error_message = None # Clear error on page change
+            st.session_state.last_error_message = None
             st.rerun()
 
     with edit_col:
@@ -377,17 +417,20 @@ def render_conversation():
                 "name": contact_name,
                 "context": context
             }
+            # Initialize the input text for the edit screen
             st.session_state.edit_contact_name_input = contact_name
+            st.session_state.initial_edit_contact_name = contact_name # Store initial name
             st.session_state.page = "edit_contact"
-            st.session_state.last_error_message = None # Clear error on page change
+            st.session_state.last_error_message = None
             st.rerun()
 
     st.markdown("---")
     st.markdown("#### 💭 Your Input")
 
+    # Use the session_state value directly for the text_area
     user_input_area = st.text_area(
         "What's happening?",
-        value=st.session_state.conversation_input_text,
+        value=st.session_state.conversation_input_text, # This reads the value for the current render
         key="conversation_input_text",
         placeholder="Share their message or your response...",
         height=120
@@ -396,13 +439,17 @@ def render_conversation():
     col1, col2 = st.columns([3, 1])
     with col1:
         if st.button("✨ Transform", key="transform_message", use_container_width=True):
-            # Process message will handle clearing last_error_message if successful
-            process_message(contact_name, st.session_state.conversation_input_text, context)
-            st.rerun() # Rerun to display potentially updated state (response or error)
+            # Capture the current value from the widget
+            input_message = st.session_state.conversation_input_text
+            process_message(contact_name, input_message, context)
+            # After processing, set the session state variable for the *next* render
+            # This will clear the text_area in the subsequent rerun
+            st.session_state.conversation_input_text = ""
+            st.rerun()
     with col2:
         if st.button("🗑️️ Clear", key="clear_input_btn", use_container_width=True):
             st.session_state.conversation_input_text = ""
-            st.session_state.last_error_message = None # Clear error when input is cleared
+            st.session_state.last_error_message = None
             st.rerun()
 
     # Display persistent error message here
@@ -413,9 +460,11 @@ def render_conversation():
     st.markdown("#### 🤖 AI Response")
 
     last_response_key = f"last_response_{contact_name}"
-    if last_response_key in st.session_state:
+    if last_response_key in st.session_state and st.session_state[last_response_key]:
         last_resp = st.session_state[last_response_key]
         # Display response only if it's recent (e.g., within last 5 minutes)
+        # Or if it's the result of the immediate previous action (i.e., not a stale response from a prior session)
+        # For simplicity, we'll keep the 5-minute check.
         if datetime.datetime.now().timestamp() - last_resp["timestamp"] < 300: # 5 minutes
             with st.container():
                 st.markdown("**AI Guidance:**")
@@ -436,17 +485,14 @@ def render_conversation():
                         st.info(f"💡 Healing Score: {last_resp['healing_score']}/10")
 
                 with col_model:
-                    # Display the model name for the current response
                     st.caption(f"🤖 Model: {last_resp.get('model', 'Unknown')}")
 
                 if last_resp["healing_score"] >= 8:
                     st.balloons()
         else:
-            # If the last response is too old, don't show it but indicate where it will appear.
+            # If the last response is too old, remove it and prompt for new input
+            del st.session_state[last_response_key]
             st.info("💭 Your AI response will appear here after you click Transform")
-            # Optionally, remove the old response from session_state if it's truly stale
-            if last_response_key in st.session_state:
-                del st.session_state[last_response_key]
     else:
         st.info("💭 Your AI response will appear here after you click Transform")
 
@@ -457,8 +503,8 @@ def render_conversation():
         st.markdown(f"**Recent Messages** ({len(history)} total)")
 
         with st.expander("View Chat History", expanded=False):
-            # Iterate through the history to display messages
-            for msg in reversed(history[-10:]): # Displaying last 10 messages for brevity
+            # Displaying last 10 messages for brevity, reversed to show newest at top of history
+            for msg in reversed(history):
                 st.markdown(f"""
                 **{msg['time']}** | **{msg['type'].title()}** | Score: {msg['healing_score']}/10
                 """)
@@ -473,14 +519,12 @@ def render_conversation():
                         "",
                         value=msg['result'],
                         height=100,
-                        key=f"history_response_{msg['id']}", # Unique key for each text area in history
-                        disabled=True # History items should be disabled for editing
+                        key=f"history_response_{msg['id']}",
+                        disabled=True
                     )
-                    # Display model name in history
                     st.caption(f"🤖 Model: {msg.get('model', 'Unknown')}")
 
-
-                st.markdown("---") # Separator for each message
+                st.markdown("---")
     else:
         st.info("📝 No chat history yet. Start a conversation above!")
 
@@ -493,7 +537,7 @@ def render_add_contact():
 
     if st.button("← Back to Contacts", key="back_to_contacts", use_container_width=True):
         st.session_state.page = "contacts"
-        st.session_state.last_error_message = None # Clear error on page change
+        st.session_state.last_error_message = None
         st.rerun()
 
     with st.form("add_contact_form"):
@@ -509,18 +553,23 @@ def render_add_contact():
         if st.form_submit_button("Add Contact"):
             name_to_add = st.session_state.add_contact_name_input
             context_to_add = st.session_state.add_contact_context_select
-            if name_to_add.strip() and save_contact(name_to_add, context_to_add):
-                st.session_state.contacts[name_to_add] = {
-                    "context": context_to_add,
-                    "history": [],
-                    "created_at": datetime.datetime.now().isoformat(),
-                    "id": None
-                }
-                st.success(f"Added {name_to_add}")
-                st.session_state.page = "contacts"
-                st.session_state.add_contact_name_input = ""
-                st.session_state.add_contact_context_select = list(CONTEXTS.keys())[0]
-                st.session_state.last_error_message = None # Clear error on successful add
+            if name_to_add.strip():
+                if name_to_add not in st.session_state.contacts: # Prevent adding duplicate names
+                    if save_contact(name_to_add, context_to_add):
+                        st.session_state.contacts = load_contacts_and_history() # Reload to get ID
+                        st.success(f"Added {name_to_add}")
+                        st.session_state.page = "contacts"
+                        st.session_state.add_contact_name_input = ""
+                        st.session_state.add_contact_context_select = list(CONTEXTS.keys())[0]
+                        st.session_state.last_error_message = None
+                        st.rerun()
+                    else:
+                        st.session_state.last_error_message = "Failed to add contact. Please try again."
+                else:
+                    st.session_state.last_error_message = "Contact with this name already exists."
+                    st.rerun()
+            else:
+                st.session_state.last_error_message = "Contact name cannot be empty."
                 st.rerun()
 
 # Main app
