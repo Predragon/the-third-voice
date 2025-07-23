@@ -429,7 +429,7 @@ def render_conversation():
 
     # Use the session_state value directly for the text_area
     user_input_area = st.text_area(
-        "What's happening?",
+        "What's happening?", # Provide a label for the input text area
         value=st.session_state.conversation_input_text, # This reads the value for the current render
         key="conversation_input_text",
         placeholder="Share their message or your response...",
@@ -462,19 +462,17 @@ def render_conversation():
     last_response_key = f"last_response_{contact_name}"
     if last_response_key in st.session_state and st.session_state[last_response_key]:
         last_resp = st.session_state[last_response_key]
-        # Display response only if it's recent (e.g., within last 5 minutes)
-        # Or if it's the result of the immediate previous action (i.e., not a stale response from a prior session)
-        # For simplicity, we'll keep the 5-minute check.
         if datetime.datetime.now().timestamp() - last_resp["timestamp"] < 300: # 5 minutes
             with st.container():
                 st.markdown("**AI Guidance:**")
                 st.text_area(
-                    "",
+                    "AI Guidance Output", # <-- Added label
                     value=last_resp['response'],
                     height=200,
                     key="ai_response_display",
                     help="Click inside and Ctrl+A to select all, then Ctrl+C to copy",
-                    disabled=False
+                    disabled=False,
+                    label_visibility="hidden" # <-- Hide the label visually
                 )
 
                 col_score, col_model = st.columns([1, 1])
@@ -490,7 +488,6 @@ def render_conversation():
                 if last_resp["healing_score"] >= 8:
                     st.balloons()
         else:
-            # If the last response is too old, remove it and prompt for new input
             del st.session_state[last_response_key]
             st.info("💭 Your AI response will appear here after you click Transform")
     else:
@@ -516,11 +513,12 @@ def render_conversation():
                 with st.container():
                     st.markdown("**AI Guidance:**")
                     st.text_area(
-                        "",
+                        "AI Guidance for History Entry", # <-- Added label
                         value=msg['result'],
                         height=100,
                         key=f"history_response_{msg['id']}",
-                        disabled=True
+                        disabled=True,
+                        label_visibility="hidden" # <-- Hide the label visually
                     )
                     st.caption(f"🤖 Model: {msg.get('model', 'Unknown')}")
 
