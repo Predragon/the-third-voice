@@ -1,7 +1,3 @@
-import streamlit as st
-import datetime
-import aiohttp
-import asyncio
 import requests
 from supabase import create_client, Client
 import os
@@ -62,42 +58,55 @@ def init_session_state():
         if key not in st.session_state:
             st.session_state[key] = value
 
-# --- Helper Functions ---
-def get_current_user_id():
+# --- Data Loading Functions ---
+@st.cache_data(ttl=30)
+def load_contacts_and_history(_user_id, page=1, page_size=50):
+    if not supabase or not _user_id:
+        return {}
     try:
-        session = supabase.auth.get_session()
-        return session.user.id if session and session.user else None
+        response = supabase.rpc("get_user_contacts_and_messages", {
+            "user_id": _user_id,
+            "page_size": page_size,
+            "page_offset": (page - 1) * page_size
+        }).execute()
+        contacts_data = {}
+        for row in response.data:
+            contact_name = row["contact_name"]
+            if contact_name not in contacts_data:
+                contacts_data[contact_name] = {
+                    "context": row["context"],
+                    "history": [],
+                    "created_at": row["created_at"],
+                    "id": row["contact_id"]
+                }
+            if row["message_id"]:
+                contacts_data[contact_name]["history"].append({
+                    "id": f"{row['message_type']}_{row['timestamp']}",
+                    "time": datetime.fromisoformat(row["timestamp"]).strftime("%m/%d %H:%M"),
+                    "type": row["message_type"],
+                    "original": row["original"],
+                    "result": row["result"] or "",
+                    "healing_score": row["healing_score"] or 0,
+                    "model": row["model"] or "Unknown",
+                    "sentiment": row["sentiment"] or "Unknown",
+                    "emotional_state": row["emotional_state"] or "Unknown"
+                })
+        return contacts_data
     except Exception as e:
-        st.error(f"Error getting user session: {e}")
+        st.warning(f"Could not load user data: {e}")
+        return {}
+
+# --- AI Message Processing ---
+@st.cache_data(ttl=3600)
+def get_cached_ai_response(_contact_name, _message, _context):
+    try:
+        response = supabase.table("ai_response_cache").select("response, healing_score, model, sentiment, emotional_state")\
+            .eq("contact_name", _contact_name).eq("message", _message).eq("context", _context).execute()
+        return response.data[0] if response.data else None
+    except Exception:
         return None
 
-def validate_input(text, max_length=100, field="input"):
-    if not text.strip():
-        st.session_state.last_error_message = f"{field} cannot be empty."
-        return False
-    if len(text) > max_length:
-        st.session_state.last_error_message = f"{field} cannot exceed {max_length} characters."
-        return False
-    if not all(c.isalnum() or c.isspace() or c in ".-_" for c in text):
-        st.session_state.last_error_message = f"{field} can only contain letters, numbers, spaces, periods, hyphens, or underscores."
-        return False
-    return True
-
-def handle_error(e, context="Operation"):
-    st.session_state.last_error_message = f"{context} failed: {e}"
-    return False
-
-# --- Authentication Functions ---
-def sign_up(email, password):
-    try:
-        response = supabase.auth.sign_up({"email": email, "password": password})
-        if response.user:
-            st.success("Sign-up successful! Please check your email to confirm your account.")
-            st.session_state.app_mode = "login"
-        elif response.error:
-            st.session_state.last_error_message = f"Sign-up failed: {response.error.message}"
-    except Exception as e:
-        handle_error(e, "Sign-up")
+# Rest of the code continues unchanged...
 
 def sign_in(email, password):
     try:
