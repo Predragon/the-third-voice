@@ -785,7 +785,7 @@ def main():
 
     # Sidebar for logout and debug
     with st.sidebar:
-        st.image("https://placehold.co/150x50/ADD8E6/000?text=The+Third+Voice+AI", use_column_width=True) # Placeholder for logo
+        st.image("https://placehold.co/150x50/ADD8E6/000?text=The+Third+Voice+AI", use_container_width=True) # Placeholder for logo
         st.title("The Third Voice AI")
         if st.session_state.authenticated:
             st.write(f"Logged in as: **{st.session_state.user.email}**")
