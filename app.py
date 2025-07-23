@@ -108,7 +108,7 @@ def sign_up(email, password):
         if response.user:
             st.success("Sign-up successful! Please check your email to confirm your account.")
             st.session_state.app_mode = "login" # Redirect to login after signup
-            st.experimental_rerun()
+            st.rerun()
         elif response.error:
             st.error(f"Sign-up failed: {response.error.message}")
     except Exception as e:
@@ -128,7 +128,7 @@ def sign_in(email, password):
             else:
                 st.session_state.app_mode = "contacts_list" # Go to contacts list
             st.success(f"Welcome back, {response.user.email}!")
-            st.experimental_rerun()
+            st.rerun()
         elif response.error:
             st.error(f"Login failed: {response.error.message}")
     except Exception as e:
@@ -152,7 +152,7 @@ def sign_out():
             st.session_state.last_error_message = None
             st.session_state.app_mode = "login" # Redirect to login after logout
             st.info("You have been logged out.")
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error(f"Logout failed: {response.error.message}")
     except Exception as e:
@@ -346,7 +346,7 @@ def process_message(contact_name, message, context):
             "model": MODEL
         }
         st.session_state.clear_conversation_input = True
-        st.experimental_rerun()
+        st.rerun()
 
     except requests.exceptions.Timeout:
         st.session_state.last_error_message = "API request timed out. Please try again. The AI might be busy."
@@ -378,7 +378,7 @@ def login_page():
     st.subheader("New User?")
     if st.button("Create an Account"):
         st.session_state.app_mode = "signup"
-        st.experimental_rerun()
+        st.rerun()
 
 def signup_page():
     """Displays the sign-up form."""
@@ -397,7 +397,7 @@ def signup_page():
     st.subheader("Already have an account?")
     if st.button("Go to Login"):
         st.session_state.app_mode = "login"
-        st.experimental_rerun()
+        st.rerun()
 
 def render_first_time_screen():
     """
@@ -431,11 +431,11 @@ def render_first_time_screen():
                         st.session_state.contacts = load_contacts_and_history() # Reload to get ID
                         st.session_state.active_contact = contact_name
                         st.session_state.app_mode = "conversation_view"
-                        st.experimental_rerun()
+                        st.rerun()
                 else:
                     st.session_state.active_contact = contact_name
                     st.session_state.app_mode = "conversation_view"
-                    st.experimental_rerun()
+                    st.rerun()
 
     st.markdown("---")
 
@@ -453,15 +453,15 @@ def render_first_time_screen():
                         st.session_state.contacts = load_contacts_and_history()  # Reload to get ID
                         st.session_state.active_contact = name_to_add
                         st.session_state.app_mode = "conversation_view"
-                        st.experimental_rerun()
+                        st.rerun()
                     else:
                         st.session_state.last_error_message = "Failed to add contact. Please try again."
                 else:
                     st.session_state.last_error_message = "Contact with this name already exists for your account."
-                    st.experimental_rerun()
+                    st.rerun()
             else:
                 st.session_state.last_error_message = "Contact name cannot be empty."
-                st.experimental_rerun()
+                st.rerun()
 
 # Contact list
 def render_contacts_list_view():
@@ -493,13 +493,13 @@ def render_contacts_list_view():
             st.session_state.conversation_input_text = ""
             st.session_state.clear_conversation_input = False
             st.session_state.last_error_message = None
-            st.experimental_rerun()
+            st.rerun()
 
     st.markdown("---")
 
     if st.button("➕ Add New Contact", use_container_width=True):
         st.session_state.app_mode = "add_contact_view"
-        st.experimental_rerun()
+        st.rerun()
 
 # Edit contact page with delete option
 def render_edit_contact_view():
@@ -508,7 +508,7 @@ def render_edit_contact_view():
     """
     if not st.session_state.edit_contact:
         st.session_state.app_mode = "contacts_list"
-        st.experimental_rerun()
+        st.rerun()
         return
 
     contact = st.session_state.edit_contact
@@ -519,7 +519,7 @@ def render_edit_contact_view():
         st.session_state.edit_contact = None
         st.session_state.last_error_message = None
         st.session_state.clear_conversation_input = False
-        st.experimental_rerun()
+        st.rerun()
 
     # Initialize or reset the input field value when entering edit mode
     if "edit_contact_name_input" not in st.session_state or st.session_state.edit_contact_name_input == "":
@@ -554,12 +554,12 @@ def render_edit_contact_view():
 
                 if not new_name.strip():
                     st.error("Contact name cannot be empty.")
-                    st.experimental_rerun()
+                    st.rerun()
 
                 # Check for duplicate name if name changed, for the current user
                 if new_name != contact["name"] and new_name in st.session_state.contacts:
                     st.error(f"Contact with name '{new_name}' already exists for your account.")
-                    st.experimental_rerun()
+                    st.rerun()
 
                 if save_contact(new_name, new_context, contact["id"]):
                     st.success(f"Updated {new_name}")
@@ -572,7 +572,7 @@ def render_edit_contact_view():
                     st.session_state.edit_contact_name_input = ""
                     st.session_state.initial_edit_contact_name = ""
                     st.session_state.clear_conversation_input = False
-                    st.experimental_rerun()
+                    st.rerun()
 
         with col2:
             if st.form_submit_button("🗑️ Delete Contact"):
@@ -583,7 +583,7 @@ def render_edit_contact_view():
                     st.session_state.edit_contact = None
                     st.session_state.last_error_message = None
                     st.session_state.clear_conversation_input = False
-                    st.experimental_rerun()
+                    st.rerun()
 
 # Conversation screen with edit button
 def render_conversation_view():
@@ -592,7 +592,7 @@ def render_conversation_view():
     """
     if not st.session_state.active_contact:
         st.session_state.app_mode = "contacts_list"
-        st.experimental_rerun()
+        st.rerun()
         return
 
     contact_name = st.session_state.active_contact
@@ -611,7 +611,7 @@ def render_conversation_view():
             st.session_state.active_contact = None
             st.session_state.last_error_message = None
             st.session_state.clear_conversation_input = False
-            st.experimental_rerun()
+            st.rerun()
 
     with edit_col:
         if st.button("✏️ Edit", key="edit_current_contact", use_container_width=True):
@@ -625,7 +625,7 @@ def render_conversation_view():
             st.session_state.app_mode = "edit_contact_view"
             st.session_state.last_error_message = None
             st.session_state.clear_conversation_input = False
-            st.experimental_rerun()
+            st.rerun()
 
     st.markdown("---")
     st.markdown("#### 💭 Your Input")
@@ -656,7 +656,7 @@ def render_conversation_view():
             st.session_state.conversation_input_text = ""
             st.session_state.clear_conversation_input = False
             st.session_state.last_error_message = None
-            st.experimental_rerun()
+            st.rerun()
 
     # Display persistent error message here
     if st.session_state.last_error_message:
@@ -743,7 +743,7 @@ def render_add_contact_view():
         st.session_state.app_mode = "contacts_list"
         st.session_state.last_error_message = None
         st.session_state.clear_conversation_input = False
-        st.experimental_rerun()
+        st.rerun()
 
     with st.form("add_contact_form"):
         name = st.text_input("Name", placeholder="Sarah, Mom, Dad...", key="add_contact_name_input_widget")
@@ -769,15 +769,15 @@ def render_add_contact_view():
                         st.session_state.add_contact_context_select = list(CONTEXTS.keys())[0] # Reset selectbox
                         st.session_state.last_error_message = None
                         st.session_state.clear_conversation_input = False
-                        st.experimental_rerun()
+                        st.rerun()
                     else:
                         st.session_state.last_error_message = "Failed to add contact. Please try again."
                 else:
                     st.session_state.last_error_message = "Contact with this name already exists for your account."
-                    st.experimental_rerun()
+                    st.rerun()
             else:
                 st.session_state.last_error_message = "Contact name cannot be empty."
-                st.experimental_rerun()
+                st.rerun()
 
 # --- Main Application Flow ---
 def main():
@@ -863,7 +863,7 @@ def main():
         else:
             # Fallback for authenticated users if app_mode is somehow invalid
             st.session_state.app_mode = "contacts_list"
-            st.experimental_rerun()
+            st.rerun()
     else:
         # User is not logged in, show login or signup pages
         if st.session_state.app_mode == "signup":
