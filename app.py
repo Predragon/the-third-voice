@@ -6,6 +6,13 @@ from supabase import create_client, Client
 import time
 
 # Constants
+REDIRECT_URL = "https://the-third-voice.streamlit.app"  # Production URL
+SUPABASE_URL = st.secrets["supabase"]["url"]
+SUPABASE_KEY = st.secrets["supabase"]["key"]
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+
+# Constants
 CONTEXTS = {
     "romantic": {"icon": "💕", "color": "#FF6B9D", "description": "Partner & intimate relationships"},
     "coparenting": {"icon": "👨‍👩‍👧‍👦", "color": "#4ECDC4", "description": "Raising children together"},
