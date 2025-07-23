@@ -139,7 +139,7 @@ def sign_out():
         handle_error(e, "Logout")
 
 # --- Data Loading Functions ---
-@st.experimental_memo(ttl=30)
+@st.cache_data(ttl=30)
 def load_contacts_and_history(_user_id, page=1, page_size=50):
     if not supabase or not _user_id:
         return {}
