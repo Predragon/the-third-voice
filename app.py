@@ -139,7 +139,7 @@ def sign_out():
         handle_error(e, "Logout")
 
 # --- Data Loading Functions ---
-@st.experimental_memo(ttl=30)
+@st.cache_data(ttl=30)
 def load_contacts_and_history(_user_id, page=1, page_size=50):
     if not supabase or not _user_id:
         return {}
@@ -244,7 +244,7 @@ def save_message(contact_name, message_type, original, result, emotional_state, 
         return False
 
 # --- AI Message Processing ---
-@st.experimental_memo(ttl=3600)
+@st.cache_data(ttl=3600)
 def get_cached_ai_response(_contact_name, _message, _context):
     try:
         response = supabase.table("ai_response_cache").select("response, healing_score, model, sentiment, emotional_state")\
@@ -617,130 +617,4 @@ def render_conversation_view():
                     else:
                         st.info(f"💡 Healing Score: {last_resp['healing_score']}/10")
                 with col_model:
-                    st.caption(f"🤖 Model: {last_resp.get('model', 'Unknown')}")
-                if last_resp["healing_score"] >= 8:
-                    st.balloons()
-        else:
-            st.info("💭 Your AI response will appear here after you click Transform")
-    st.markdown("---")
-    st.markdown("#### 📜 Conversation History")
-    if history:
-        st.markdown(f"**Recent Messages** ({len(history)} total)")
-        with st.expander("View Chat History", expanded=False):
-            for msg in reversed(history[-5:]):
-                st.write_stream(f"""
-                **{msg['time']}** | **{msg['type'].title()}** | Score: {msg['healing_score']}/10
-                **Your Message:** {msg['original']}
-                **AI Guidance:** {msg['result']}
-                🤖 Model: {msg.get('model', 'Unknown')}
-                ---
-                """)
-            if len(history) > 5:
-                if st.button("Load More", key=f"load_more_{contact_name}"):
-                    st.session_state.history_page += 1
-                    st.session_state.contacts = load_contacts_and_history(get_current_user_id(), page=st.session_state.history_page)
-                    st.rerun()
-    else:
-        st.info("📝 No chat history yet. Start a conversation above!")
-
-def render_add_contact_view():
-    st.markdown("### ➕ Add New Contact")
-    if st.button("← Back to Contacts", key="back_to_contacts", use_container_width=True):
-        st.session_state.update({
-            "app_mode": "contacts_list",
-            "last_error_message": None,
-            "clear_conversation_input": False
-        })
-    with st.form("add_contact_form"):
-        name = st.text_input("Name", placeholder="Sarah, Mom, Dad...", key="add_contact_name_input_widget")
-        context_options = list(CONTEXTS.keys())
-        context_selected_index = context_options.index(st.session_state.add_contact_context_select) if st.session_state.add_contact_context_select in context_options else 0
-        context = st.selectbox("Relationship", context_options, index=context_selected_index, format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}", key="add_contact_context_select_widget")
-        def handle_add_contact_submit():
-            name_to_add = st.session_state.add_contact_name_input_widget
-            context_to_add = st.session_state.add_contact_context_select_widget
-            if name_to_add.strip() and save_contact(name_to_add, context_to_add):
-                st.session_state.update({
-                    "contacts": load_contacts_and_history(get_current_user_id()),
-                    "app_mode": "contacts_list",
-                    "add_contact_name_input": "",
-                    "add_contact_context_select": list(CONTEXTS.keys())[0],
-                    "last_error_message": None,
-                    "clear_conversation_input": False
-                })
-                st.success(f"Added {name_to_add}")
-        st.form_submit_button("Add Contact", on_submit=handle_add_contact_submit)
-
-# --- Main Application Flow ---
-def main():
-    init_session_state()
-    def restore_session():
-        try:
-            session = supabase.auth.get_session()
-            if session and session.user:
-                if session.expires_at and session.expires_at < datetime.now(timezone.utc).timestamp():
-                    st.session_state.update({
-                        "authenticated": False,
-                        "app_mode": "login",
-                        "last_error_message": "Session expired. Please log in again."
-                    })
-                else:
-                    st.session_state.update({
-                        "authenticated": True,
-                        "user": session.user,
-                        "contacts": load_contacts_and_history(session.user.id),
-                        "app_mode": "contacts_list" if load_contacts_and_history(session.user.id) else "first_time_setup"
-                    })
-            else:
-                st.session_state.authenticated = False
-                st.session_state.app_mode = "login"
-        except Exception as e:
-            handle_error(e, "Session restoration")
-    restore_session()
-
-    st.set_page_config(page_title="The Third Voice", layout="wide")
-    with st.sidebar:
-        st.image("https://placehold.co/150x50/ADD8E6/000?text=The+Third+Voice+AI", use_container_width=True)
-        st.title("The Third Voice AI")
-        if st.session_state.authenticated:
-            st.write(f"Logged in as: **{st.session_state.user.email}**")
-            st.write(f"User ID: `{st.session_state.user.id}`")
-            if st.button("Logout", use_container_width=True):
-                sign_out()
-        st.markdown("---")
-        st.subheader("🚀 Debug Info (For Co-Founders Only)")
-        if st.checkbox("Show Debug Details"):
-            debug_info = {
-                "Supabase Connected": "Yes" if supabase.auth.get_session() else "No",
-                "User ID": st.session_state.user.id if st.session_state.user else None,
-                "User Email": st.session_state.user.email if st.session_state.user else None,
-                "Contacts Count": len(st.session_state.contacts),
-                "Secrets Loaded": {
-                    "Supabase URL": bool(st.secrets.get("supabase", {}).get("url")),
-                    "Supabase Key": bool(st.secrets.get("supabase", {}).get("key")),
-                    "OpenRouter API Key": bool(st.secrets.get("openrouter", {}).get("api_key"))
-                }
-            }
-            st.code(json.dumps(debug_info, indent=2, default=str), language="json")
-
-    if st.session_state.authenticated:
-        if st.session_state.app_mode == "first_time_setup":
-            render_first_time_screen()
-        elif st.session_state.app_mode == "contacts_list":
-            render_contacts_list_view()
-        elif st.session_state.app_mode == "conversation_view":
-            render_conversation_view()
-        elif st.session_state.app_mode == "edit_contact_view":
-            render_edit_contact_view()
-        elif st.session_state.app_mode == "add_contact_view":
-            render_add_contact_view()
-        else:
-            st.session_state.app_mode = "contacts_list"
-    else:
-        if st.session_state.app_mode == "signup":
-            signup_page()
-        else:
-            login_page()
-
-if __name__ == "__main__":
-    main()
+                    st.caption(f"🤖 Model: {last_resp.
