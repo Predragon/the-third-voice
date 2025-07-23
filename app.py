@@ -13,7 +13,7 @@ CONTEXTS = {
 }
 
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL = "google/gemma-2-9b-it:free" # Your model name
+MODEL = "google/gemma-2-9b-it:free"  # Your model name
 
 # Initialize Supabase
 @st.cache_resource
@@ -44,10 +44,10 @@ def load_contacts_and_history():
             contact_name = msg["contact_name"]
             if contact_name not in contacts_data:
                 contacts_data[contact_name] = {
-                    "context": "family", # Default context if message exists but contact doesn't
+                    "context": "family",  # Default context if message exists but contact doesn't
                     "history": [],
                     "created_at": datetime.datetime.now().isoformat(),
-                    "id": None # Will need to be updated if contact is later saved
+                    "id": None  # Will need to be updated if contact is later saved
                 }
             contacts_data[contact_name]["history"].append({
                 "id": f"{msg['type']}_{msg['timestamp']}",
@@ -89,6 +89,9 @@ def delete_contact(contact_id):
         if contact_name_data:
             contact_name = contact_name_data[0]["name"]
             supabase.table("messages").delete().eq("contact_name", contact_name).execute()
+            # Clear last response from session state
+            if f"last_response_{contact_name}" in st.session_state:
+                del st.session_state[f"last_response_{contact_name}"]
 
         supabase.table("contacts").delete().eq("id", contact_id).execute()
         st.cache_data.clear()
@@ -120,6 +123,7 @@ def initialize_session():
         "active_contact": None,
         "edit_contact": None,
         "conversation_input_text": "",
+        "clear_conversation_input": False,  # Flag to control input clearing
         "edit_contact_name_input": "",
         "add_contact_name_input": "",
         "add_contact_context_select": list(CONTEXTS.keys())[0],
@@ -194,7 +198,7 @@ def process_message(contact_name, message, context):
             "timestamp": datetime.datetime.now().timestamp(),
             "model": MODEL
         }
-        # Do NOT clear conversation_input_text here. It will be cleared in render_conversation() after rerun.
+        st.session_state.clear_conversation_input = True  # Set flag to clear input on next render
 
     except requests.exceptions.Timeout:
         st.session_state.last_error_message = "API request timed out. Please try again. The AI might be busy."
@@ -244,7 +248,6 @@ def render_first_time_screen():
                     st.session_state.page = "conversation"
                     st.rerun()
 
-
     st.markdown("---")
 
     with st.form("add_custom_contact_first_time"):
@@ -256,9 +259,9 @@ def render_first_time_screen():
             name_to_add = st.session_state.first_time_new_contact_name_input
             context_to_add = st.session_state.first_time_new_contact_context_select
             if name_to_add.strip():
-                if name_to_add not in st.session_state.contacts: # Prevent adding duplicate names
+                if name_to_add not in st.session_state.contacts:  # Prevent adding duplicate names
                     if save_contact(name_to_add, context_to_add):
-                        st.session_state.contacts = load_contacts_and_history() # Reload to get ID
+                        st.session_state.contacts = load_contacts_and_history()  # Reload to get ID
                         st.session_state.active_contact = name_to_add
                         st.session_state.page = "conversation"
                         st.rerun()
@@ -266,8 +269,10 @@ def render_first_time_screen():
                         st.session_state.last_error_message = "Failed to add contact. Please try again."
                 else:
                     st.session_state.last_error_message = "Contact with this name already exists."
-                    st.rerun() # Rerun to show the error message
-
+                    st.rerun()
+            else:
+                st.session_state.last_error_message = "Contact name cannot be empty."
+                st.rerun()
 
 # Contact list
 def render_contact_list():
@@ -297,6 +302,7 @@ def render_contact_list():
             st.session_state.active_contact = name
             st.session_state.page = "conversation"
             st.session_state.conversation_input_text = ""
+            st.session_state.clear_conversation_input = False
             st.session_state.last_error_message = None
             st.rerun()
 
@@ -318,47 +324,43 @@ def render_edit_contact():
         st.session_state.page = "conversation"
         st.session_state.edit_contact = None
         st.session_state.last_error_message = None
+        st.session_state.clear_conversation_input = False
         st.rerun()
 
     # Initialize or reset the input field value when entering edit mode
-    # Check if the session state input is empty or doesn't match the current contact's name
-    # This prevents the input field from being reset if the user types something and then reruns
     if "edit_contact_name_input" not in st.session_state or st.session_state.edit_contact_name_input == "":
         st.session_state.edit_contact_name_input = contact["name"]
     elif st.session_state.edit_contact_name_input != contact["name"] and st.session_state.edit_contact_name_input == st.session_state.get('initial_edit_contact_name', ''):
-        # This handles cases where user navigates back and forth or a rerun occurs
         st.session_state.edit_contact_name_input = contact["name"]
 
     # Store initial name to detect changes later if needed
     if 'initial_edit_contact_name' not in st.session_state:
         st.session_state.initial_edit_contact_name = contact["name"]
     elif st.session_state.initial_edit_contact_name != contact["name"]:
-        # If the active contact changed while on edit page, update initial value
         st.session_state.initial_edit_contact_name = contact["name"]
-        st.session_state.edit_contact_name_input = contact["name"] # Also reset the input value
-
+        st.session_state.edit_contact_name_input = contact["name"]
 
     with st.form("edit_contact_form"):
         name_input = st.text_input("Name",
                                    value=st.session_state.edit_contact_name_input,
-                                   key="edit_contact_name_input_widget") # Changed key to avoid conflict
+                                   key="edit_contact_name_input_widget")
 
         context_options = list(CONTEXTS.keys())
         initial_context_index = context_options.index(contact["context"]) if contact["context"] in context_options else 0
         context = st.selectbox("Relationship", context_options,
-                             index=initial_context_index,
-                             format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}",
-                             key="edit_contact_context_select")
+                               index=initial_context_index,
+                               format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}",
+                               key="edit_contact_context_select")
 
         col1, col2 = st.columns(2)
         with col1:
             if st.form_submit_button("💾 Save Changes"):
-                new_name = st.session_state.edit_contact_name_input_widget # Get value from the widget's key
+                new_name = st.session_state.edit_contact_name_input_widget
                 new_context = st.session_state.edit_contact_context_select
 
                 if not new_name.strip():
                     st.error("Contact name cannot be empty.")
-                    st.rerun() # Rerun to display error and keep form state
+                    st.rerun()
 
                 # Check for duplicate name if name changed
                 if new_name != contact["name"] and new_name in st.session_state.contacts:
@@ -373,9 +375,9 @@ def render_edit_contact():
                     st.session_state.page = "conversation"
                     st.session_state.edit_contact = None
                     st.session_state.last_error_message = None
-                    # Clear edit_contact_name_input_widget for the next edit session
                     st.session_state.edit_contact_name_input = ""
-                    st.session_state.initial_edit_contact_name = "" # Reset initial name
+                    st.session_state.initial_edit_contact_name = ""
+                    st.session_state.clear_conversation_input = False
                     st.rerun()
 
         with col2:
@@ -386,6 +388,7 @@ def render_edit_contact():
                     st.session_state.active_contact = None
                     st.session_state.edit_contact = None
                     st.session_state.last_error_message = None
+                    st.session_state.clear_conversation_input = False
                     st.rerun()
 
 # Conversation screen with edit button
@@ -408,6 +411,7 @@ def render_conversation():
             st.session_state.page = "contacts"
             st.session_state.active_contact = None
             st.session_state.last_error_message = None
+            st.session_state.clear_conversation_input = False
             st.rerun()
 
     with edit_col:
@@ -417,38 +421,42 @@ def render_conversation():
                 "name": contact_name,
                 "context": context
             }
-            # Initialize the input text for the edit screen
             st.session_state.edit_contact_name_input = contact_name
-            st.session_state.initial_edit_contact_name = contact_name # Store initial name
+            st.session_state.initial_edit_contact_name = contact_name
             st.session_state.page = "edit_contact"
             st.session_state.last_error_message = None
+            st.session_state.clear_conversation_input = False
             st.rerun()
 
     st.markdown("---")
     st.markdown("#### 💭 Your Input")
 
-    # Use the session_state value directly for the text_area
+    # Determine the text area value based on clear_conversation_input
+    input_value = "" if st.session_state.clear_conversation_input else st.session_state.conversation_input_text
+
     user_input_area = st.text_area(
-        "What's happening?", # Provide a label for the input text area
-        value=st.session_state.conversation_input_text, # This reads the value for the current render
+        "What's happening?",
+        value=input_value,
         key="conversation_input_text",
         placeholder="Share their message or your response...",
         height=120
     )
 
+    # Reset the clear flag after rendering the text area with an empty value
+    if st.session_state.clear_conversation_input:
+        st.session_state.clear_conversation_input = False
+        st.session_state.conversation_input_text = ""
+
     col1, col2 = st.columns([3, 1])
     with col1:
         if st.button("✨ Transform", key="transform_message", use_container_width=True):
-            # Capture the current value from the widget
             input_message = st.session_state.conversation_input_text
             process_message(contact_name, input_message, context)
-            # After processing, set the session state variable for the *next* render
-            # This will clear the text_area in the subsequent rerun
-            st.session_state.conversation_input_text = ""
             st.rerun()
     with col2:
         if st.button("🗑️️ Clear", key="clear_input_btn", use_container_width=True):
             st.session_state.conversation_input_text = ""
+            st.session_state.clear_conversation_input = False
             st.session_state.last_error_message = None
             st.rerun()
 
@@ -462,17 +470,17 @@ def render_conversation():
     last_response_key = f"last_response_{contact_name}"
     if last_response_key in st.session_state and st.session_state[last_response_key]:
         last_resp = st.session_state[last_response_key]
-        if datetime.datetime.now().timestamp() - last_resp["timestamp"] < 300: # 5 minutes
+        if datetime.datetime.now().timestamp() - last_resp["timestamp"] < 300:  # 5 minutes
             with st.container():
                 st.markdown("**AI Guidance:**")
                 st.text_area(
-                    "AI Guidance Output", # <-- Added label
+                    "AI Guidance Output",
                     value=last_resp['response'],
                     height=200,
                     key="ai_response_display",
                     help="Click inside and Ctrl+A to select all, then Ctrl+C to copy",
                     disabled=False,
-                    label_visibility="hidden" # <-- Hide the label visually
+                    label_visibility="hidden"
                 )
 
                 col_score, col_model = st.columns([1, 1])
@@ -501,7 +509,7 @@ def render_conversation():
 
         with st.expander("View Chat History", expanded=False):
             # Displaying last 10 messages for brevity, reversed to show newest at top of history
-            for msg in reversed(history):
+            for msg in reversed(history[-10:]):
                 st.markdown(f"""
                 **{msg['time']}** | **{msg['type'].title()}** | Score: {msg['healing_score']}/10
                 """)
@@ -513,12 +521,12 @@ def render_conversation():
                 with st.container():
                     st.markdown("**AI Guidance:**")
                     st.text_area(
-                        "AI Guidance for History Entry", # <-- Added label
+                        "AI Guidance for History Entry",
                         value=msg['result'],
                         height=100,
                         key=f"history_response_{msg['id']}",
                         disabled=True,
-                        label_visibility="hidden" # <-- Hide the label visually
+                        label_visibility="hidden"
                     )
                     st.caption(f"🤖 Model: {msg.get('model', 'Unknown')}")
 
@@ -536,6 +544,7 @@ def render_add_contact():
     if st.button("← Back to Contacts", key="back_to_contacts", use_container_width=True):
         st.session_state.page = "contacts"
         st.session_state.last_error_message = None
+        st.session_state.clear_conversation_input = False
         st.rerun()
 
     with st.form("add_contact_form"):
@@ -544,22 +553,23 @@ def render_add_contact():
         context_selected_index = context_options.index(st.session_state.add_contact_context_select) if st.session_state.add_contact_context_select in context_options else 0
 
         context = st.selectbox("Relationship", context_options,
-                              index=context_selected_index,
-                              format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}",
-                              key="add_contact_context_select")
+                               index=context_selected_index,
+                               format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}",
+                               key="add_contact_context_select")
 
         if st.form_submit_button("Add Contact"):
             name_to_add = st.session_state.add_contact_name_input
             context_to_add = st.session_state.add_contact_context_select
             if name_to_add.strip():
-                if name_to_add not in st.session_state.contacts: # Prevent adding duplicate names
+                if name_to_add not in st.session_state.contacts:  # Prevent adding duplicate names
                     if save_contact(name_to_add, context_to_add):
-                        st.session_state.contacts = load_contacts_and_history() # Reload to get ID
+                        st.session_state.contacts = load_contacts_and_history()  # Reload to get ID
                         st.success(f"Added {name_to_add}")
                         st.session_state.page = "contacts"
                         st.session_state.add_contact_name_input = ""
                         st.session_state.add_contact_context_select = list(CONTEXTS.keys())[0]
                         st.session_state.last_error_message = None
+                        st.session_state.clear_conversation_input = False
                         st.rerun()
                     else:
                         st.session_state.last_error_message = "Failed to add contact. Please try again."
