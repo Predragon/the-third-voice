@@ -432,7 +432,7 @@ def render_conversation():
     st.markdown("#### 💭 Your Input")
 
     # Determine the text area value based on clear_conversation_input
-    input_value = "" if st.session_state.clear_conversation_input else st.session_state.conversation_input_text
+    input_value = "" if st.session_state.clear_conversation_input else st.session_state.get("conversation_input_text", "")
 
     user_input_area = st.text_area(
         "What's happening?",
@@ -442,10 +442,9 @@ def render_conversation():
         height=120
     )
 
-    # Reset the clear flag after rendering the text area with an empty value
+    # Reset the clear flag after rendering the text area
     if st.session_state.clear_conversation_input:
         st.session_state.clear_conversation_input = False
-        st.session_state.conversation_input_text = ""
 
     col1, col2 = st.columns([3, 1])
     with col1:
