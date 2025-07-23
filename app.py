@@ -64,7 +64,7 @@ if 'add_contact_context_select' not in st.session_state:
 if 'last_error_message' not in st.session_state:
     st.session_state.last_error_message = None
 
-# --- Helper Functions ---
+# --- Helper Function to Get Current User ID ---
 def get_current_user_id():
     try:
         session = supabase.auth.get_session()
@@ -74,6 +74,16 @@ def get_current_user_id():
     except Exception as e:
         st.error(f"Error getting user session: {e}")
         return None
+
+# --- Supabase Contact Existence Check ---
+# This helper function checks the database directly for existing contacts by name and user_id
+def contact_exists_for_user(name, user_id):
+    try:
+        response = supabase.table("contacts").select("id").eq("name", name).eq("user_id", user_id).execute()
+        return bool(response.data) and len(response.data) > 0
+    except Exception as e:
+        st.warning(f"Error checking contact existence in DB: {e}")
+        return False
 
 # --- Authentication Functions ---
 def sign_up(email, password):
@@ -129,7 +139,7 @@ def sign_out():
     except Exception as e:
         st.error(f"An unexpected error occurred during logout: {e}")
 
-# --- Data Loading ---
+# --- Data Loading Functions ---
 @st.cache_data(ttl=60)
 def load_contacts_and_history():
     user_id = get_current_user_id()
@@ -172,12 +182,17 @@ def load_contacts_and_history():
         st.warning(f"Could not load user data: {e}")
         return {}
 
-# --- Data Saving ---
+# --- Data Saving Functions ---
 def save_contact(name, context, contact_id=None):
     user_id = get_current_user_id()
     if not supabase or not name.strip() or not user_id:
         st.error("Cannot save contact: User not logged in or invalid input.")
         return False
+    # Only check for existence in DB if it's a new contact (contact_id is None)
+    if contact_id is None:
+        if contact_exists_for_user(name, user_id):
+            st.error(f"A contact with the name '{name}' already exists for your account.")
+            return False
     try:
         contact_data = {"name": name, "context": context, "user_id": user_id}
         if contact_id:
@@ -349,13 +364,16 @@ def render_first_time_screen():
                     "friend": "Friend"
                 }
                 contact_name = default_names.get(context_key, context_key.title())
-                if contact_name not in st.session_state.contacts:
-                    if save_contact(contact_name, context_key):
+                # Use the database check here too for initial contact creation
+                user_id = get_current_user_id()
+                if user_id and not contact_exists_for_user(contact_name, user_id):
+                    if save_contact(contact_name, context_key): # save_contact also checks in DB
                         st.session_state.contacts = load_contacts_and_history()
                         st.session_state.active_contact = contact_name
                         st.session_state.app_mode = "conversation_view"
                         st.rerun()
                 else:
+                    # If it already exists or user_id is None, just set active and go
                     st.session_state.active_contact = contact_name
                     st.session_state.app_mode = "conversation_view"
                     st.rerun()
@@ -368,14 +386,14 @@ def render_first_time_screen():
             name_to_add = st.session_state.first_time_new_contact_name_input
             context_to_add = st.session_state.first_time_new_contact_context_select
             if name_to_add.strip():
-                if name_to_add not in st.session_state.contacts:
-                    if save_contact(name_to_add, context_to_add):
-                        st.session_state.contacts = load_contacts_and_history()
-                        st.session_state.active_contact = name_to_add
-                        st.session_state.app_mode = "conversation_view"
-                        st.rerun()
+                # save_contact now performs the DB check internally
+                if save_contact(name_to_add, context_to_add):
+                    st.session_state.contacts = load_contacts_and_history()
+                    st.session_state.active_contact = name_to_add
+                    st.session_state.app_mode = "conversation_view"
+                    st.rerun()
                 else:
-                    st.session_state.last_error_message = "Contact with this name already exists for your account."
+                    # save_contact will set an error message if it fails (e.g., duplicate)
                     st.rerun()
             else:
                 st.session_state.last_error_message = "Contact name cannot be empty."
@@ -449,9 +467,7 @@ def render_edit_contact_view():
                 if not new_name.strip():
                     st.error("Contact name cannot be empty.")
                     st.rerun()
-                if new_name != contact["name"] and new_name in st.session_state.contacts:
-                    st.error(f"Contact with name '{new_name}' already exists for your account.")
-                    st.rerun()
+                # The save_contact function now handles duplicate checks
                 if save_contact(new_name, new_context, contact["id"]):
                     st.success(f"Updated {new_name}")
                     if st.session_state.active_contact == contact["name"]:
@@ -463,6 +479,9 @@ def render_edit_contact_view():
                     st.session_state.initial_edit_contact_name = ""
                     st.session_state.clear_conversation_input = False
                     st.rerun()
+                else:
+                    st.rerun() # Rerun to display error from save_contact
+
         with col2:
             if st.form_submit_button("🗑️ Delete Contact"):
                 if delete_contact(contact["id"]):
@@ -610,20 +629,18 @@ def render_add_contact_view():
             name_to_add = st.session_state.add_contact_name_input_widget
             context_to_add = st.session_state.add_contact_context_select_widget
             if name_to_add.strip():
-                if name_to_add not in st.session_state.contacts:
-                    if save_contact(name_to_add, context_to_add):
-                        st.session_state.contacts = load_contacts_and_history() 
-                        st.success(f"Added {name_to_add}")
-                        st.session_state.app_mode = "contacts_list"
-                        st.session_state.add_contact_name_input = ""
-                        st.session_state.add_contact_context_select = list(CONTEXTS.keys())[0]
-                        st.session_state.last_error_message = None
-                        st.session_state.clear_conversation_input = False
-                        st.rerun()
-                    else:
-                        st.session_state.last_error_message = "Failed to add contact. Please try again."
+                # save_contact now performs the DB check internally
+                if save_contact(name_to_add, context_to_add):
+                    st.session_state.contacts = load_contacts_and_history()
+                    st.success(f"Added {name_to_add}")
+                    st.session_state.app_mode = "contacts_list"
+                    st.session_state.add_contact_name_input = ""
+                    st.session_state.add_contact_context_select = list(CONTEXTS.keys())[0]
+                    st.session_state.last_error_message = None
+                    st.session_state.clear_conversation_input = False
+                    st.rerun()
                 else:
-                    st.session_state.last_error_message = "Contact with this name already exists for your account."
+                    # save_contact will set an error message if it fails (e.g., duplicate)
                     st.rerun()
             else:
                 st.session_state.last_error_message = "Contact name cannot be empty."
@@ -664,53 +681,44 @@ def main():
         st.subheader("🚀 Debug Info (For Co-Founders Only)")
 
         if st.checkbox("Show Debug Details"):
-            st.write("### 🔑 Supabase Connection Status:")
             try:
                 session = supabase.auth.get_session()
                 user_resp = supabase.auth.get_user()
                 user = user_resp.user if user_resp else None
 
-                if session:
-                    st.success("Supabase connected and user session active!")
-                    st.write(f"**User ID:** `{user.id if user else 'N/A'}`")
-                    st.write(f"**User Email:** `{user.email if user else 'N/A'}`")
-                    st.write(f"**Session Expires At:** `{session.expires_at}`")
-                    st.write(f"**Access Token (Truncated):** `{session.access_token[:10]}...`")
-                else:
-                    st.warning("Supabase connected, but no active user session.")
-                    st.write("User needs to log in.")
+                # Compose debug info dictionary
+                debug_info = {
+                    "Supabase Connected": "Yes" if session else "No",
+                    "User ID": user.id if user else None,
+                    "User Email": user.email if user else None,
+                    "Session Expires At": session.expires_at if session else None,
+                    "Access Token": session.access_token[:10] + "..." if session and session.access_token else None,
+                    "Test Contacts Query": None,
+                    "Streamlit Session State": dict(st.session_state),
+                    "Environment Variables": {
+                        "STREAMLIT_SERVER_PORT": os.getenv("STREAMLIT_SERVER_PORT"),
+                    },
+                    "Secrets Loaded": {
+                        "Supabase URL": bool(st.secrets.get("supabase", {}).get("url")),
+                        "Supabase Key": bool(st.secrets.get("supabase", {}).get("key")),
+                        "OpenRouter API Key": bool(st.secrets.get("openrouter", {}).get("api_key")),
+                    }
+                }
 
-                st.write("Attempting a test query (respects RLS if enabled)...")
+                # Get test contacts
                 try:
                     test_contacts_query = supabase.table("contacts").select("id").limit(1).execute()
-                    st.write(f"Test query result: {test_contacts_query.data if test_contacts_query.data else 'No contacts found or RLS restricted.'}")
+                    debug_info["Test Contacts Query"] = test_contacts_query.data if test_contacts_query.data else "No contacts found or RLS restricted."
                 except Exception as e:
-                    st.error(f"Test query failed: {e}")
+                    debug_info["Test Contacts Query"] = f"Test query failed: {e}"
+
+                # Render the whole debug info as nicely formatted JSON
+                st.code(json.dumps(debug_info, indent=2, default=str), language="json")
 
             except Exception as e:
-                st.error(f"Supabase connection or authentication error: {e}")
-                st.write("Please ensure `[supabase] url` and `[supabase] key` are set in Streamlit Cloud App Secrets.")
+                st.error(f"Error generating debug info: {e}")
 
-            st.write("### 💾 Streamlit Session State:")
-            st.json(st.session_state.to_dict())
-
-            st.write("### 🌐 Environment Variables (Limited View):")
-            env_vars_to_show = {
-                "STREAMLIT_SERVER_PORT": os.getenv("STREAMLIT_SERVER_PORT"),
-            }
-            st.json(env_vars_to_show)
-
-            st.write("### 📜 Streamlit Secrets (Accessible via code):")
-            st.write(f"Supabase URL: `{'*' * 5} (loaded)`")
-            st.write(f"Supabase Key: `{'*' * 5} (loaded)`")
-            st.write(f"OpenRouter API Key: `{'*' * 5} (loaded)`")
-            if not st.secrets.get("supabase", {}).get("url"):
-                st.error("Supabase URL secret is missing or empty under [supabase]!")
-            if not st.secrets.get("supabase", {}).get("key"):
-                st.error("Supabase Key secret is missing or empty under [supabase]!")
-            if not st.secrets.get("openrouter", {}).get("api_key"):
-                st.error("OpenRouter API Key secret is missing or empty under [openrouter]!")
-
+    # --- Page Routing based on authentication and app_mode ---
     if st.session_state.authenticated:
         if st.session_state.app_mode == "first_time_setup":
             render_first_time_screen()
