@@ -3,7 +3,7 @@ import datetime
 import requests
 from supabase import create_client
 
-# Constants
+# Constants (keep these as they are)
 CONTEXTS = {
     "romantic": {"icon": "💕", "description": "Partner & intimate relationships"},
     "coparenting": {"icon": "👨‍👩‍👧‍👦", "description": "Raising children together"},
@@ -15,7 +15,7 @@ CONTEXTS = {
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODEL = "google/gemma-2-9b-it:free"
 
-# Initialize Supabase
+# Initialize Supabase (keep this as it is)
 @st.cache_resource
 def init_supabase():
     try:
@@ -26,7 +26,7 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Load data
+# Load data (keep this as it is)
 @st.cache_data(ttl=60)
 def load_contacts_and_history():
     if not supabase:
@@ -62,7 +62,7 @@ def load_contacts_and_history():
         st.warning(f"Could not load data: {e}")
         return {}
 
-# Save data
+# Save data (keep these as they are)
 def save_contact(name, context, contact_id=None):
     if not supabase or not name.strip():
         return False
@@ -106,7 +106,7 @@ def save_message(contact, message_type, original, result, emotional_state, heali
         st.error(f"Error saving message: {e}")
         return False
 
-# Initialize session state
+# Initialize session state (keep this as it is, no need for the `clear_input` key anymore)
 def initialize_session():
     defaults = {
         "contacts": load_contacts_and_history(),
@@ -124,7 +124,7 @@ def initialize_session():
 
 initialize_session()
 
-# Process message
+# Process message (keep this as it is)
 def process_message(contact_name, message, context):
     if not message.strip():
         return
@@ -183,13 +183,12 @@ def process_message(contact_name, message, context):
                 "timestamp": datetime.datetime.now().timestamp(),
                 "model": MODEL
             }
-            # Clear input after processing
-            st.session_state.conversation_input_text = ""
+            st.session_state.conversation_input_text = "" # Clear input after processing
 
         except Exception as e:
             st.error(f"Failed to process message: {e}")
 
-# First time user screen
+# First time user screen (keep this as it is)
 def render_first_time_screen():
     st.markdown("### 🎙️ Welcome to The Third Voice")
     st.markdown("Choose a relationship type to get started, or add a custom contact:")
@@ -226,10 +225,10 @@ def render_first_time_screen():
 
     st.markdown("---")
 
-    with st.form("add_custom_contact_first_time"): # Changed key to avoid conflict
+    with st.form("add_custom_contact_first_time"):
         st.markdown("**Or add a custom contact:**")
-        name = st.text_input("Name", placeholder="Sarah, Mom, Dad...", key="first_time_new_contact_name_input") # Added key
-        context = st.selectbox("Relationship", list(CONTEXTS.keys()), format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}", key="first_time_new_contact_context_select") # Added key
+        name = st.text_input("Name", placeholder="Sarah, Mom, Dad...", key="first_time_new_contact_name_input")
+        context = st.selectbox("Relationship", list(CONTEXTS.keys()), format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}", key="first_time_new_contact_context_select")
 
         if st.form_submit_button("Add Custom Contact"):
             name_to_add = st.session_state.first_time_new_contact_name_input
@@ -245,7 +244,7 @@ def render_first_time_screen():
                 st.session_state.page = "conversation"
                 st.rerun()
 
-# Contact list (modified for compactness and simpler display)
+# Contact list (keep this as it is)
 def render_contact_list():
     if st.session_state.page != "contacts":
         return
@@ -267,7 +266,6 @@ def render_contact_list():
         ):
             st.session_state.active_contact = name
             st.session_state.page = "conversation"
-            # When switching to conversation, ensure the text input is cleared
             st.session_state.conversation_input_text = ""
             st.rerun()
 
@@ -277,7 +275,7 @@ def render_contact_list():
         st.session_state.page = "add_contact"
         st.rerun()
 
-# Edit contact page with delete option
+# Edit contact page with delete option (keep this as it is, it should be working fine)
 def render_edit_contact():
     if st.session_state.page != "edit_contact" or not st.session_state.edit_contact:
         return
@@ -290,22 +288,19 @@ def render_edit_contact():
         st.session_state.edit_contact = None
         st.rerun()
 
-    # Initialize the input field's session state if it's not already set
-    # Or more robustly, set it when we transition to this page
-    # This ensures the input starts with the correct contact name
     if st.session_state.edit_contact_name_input == "" or st.session_state.edit_contact_name_input != contact["name"]:
         st.session_state.edit_contact_name_input = contact["name"]
 
 
     with st.form("edit_contact_form"):
         name_input = st.text_input("Name",
-                                   value=st.session_state.edit_contact_name_input, # Stable value
-                                   key="edit_contact_name_input") # This key stores the current value
+                                   value=st.session_state.edit_contact_name_input,
+                                   key="edit_contact_name_input")
 
         context = st.selectbox("Relationship", list(CONTEXTS.keys()),
                              index=list(CONTEXTS.keys()).index(contact["context"]),
                              format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}",
-                             key="edit_contact_context_select") # Added key for selectbox
+                             key="edit_contact_context_select")
 
         col1, col2 = st.columns(2)
         with col1:
@@ -314,7 +309,6 @@ def render_edit_contact():
                 new_context = st.session_state.edit_contact_context_select
                 if new_name.strip() and save_contact(new_name, new_context, contact["id"]):
                     st.success(f"Updated {new_name}")
-                    # Update active contact name if it changed
                     if st.session_state.active_contact == contact["name"]:
                         st.session_state.active_contact = new_name
                     st.session_state.page = "conversation"
@@ -330,7 +324,7 @@ def render_edit_contact():
                     st.session_state.edit_contact = None
                     st.rerun()
 
-# Conversation screen with edit button
+# Conversation screen with edit button (THIS IS THE FUNCTION TO REPLACE)
 def render_conversation():
     if st.session_state.page != "conversation" or not st.session_state.active_contact:
         return
@@ -358,7 +352,6 @@ def render_conversation():
                 "name": contact_name,
                 "context": context
             }
-            # Pre-fill the edit contact name input when going to edit page
             st.session_state.edit_contact_name_input = contact_name
             st.session_state.page = "edit_contact"
             st.rerun()
@@ -366,27 +359,24 @@ def render_conversation():
     st.markdown("---")
     st.markdown("#### 💭 Your Input")
 
+    # The text_area, its value, and key
     user_input_area = st.text_area(
         "What's happening?",
         value=st.session_state.conversation_input_text,
-        key="conversation_input_text", # This key automatically stores/retrieves the current input
+        key="conversation_input_text",
         placeholder="Share their message or your response...",
         height=120
     )
 
-    # Use the session state value for the disabled logic
-    # The text_area widget updates its associated session_state key immediately on user input
-    is_transform_disabled = not st.session_state.conversation_input_text.strip()
-
+    # Removed the `disabled` argument from the Transform button
+    # The `process_message` function already handles empty input.
     col1, col2 = st.columns([3, 1])
     with col1:
-        if st.button("✨ Transform", key="transform_message",
-                    disabled=is_transform_disabled, # Use the correctly derived disabled state
-                    use_container_width=True):
+        if st.button("✨ Transform", key="transform_message", use_container_width=True):
             last_response_key = f"last_response_{contact_name}"
             if last_response_key in st.session_state:
                 del st.session_state[last_response_key]
-            # Pass the actual content from the session_state key to process_message
+            # Use the value from session_state for processing
             process_message(contact_name, st.session_state.conversation_input_text, context)
             st.rerun()
     with col2:
@@ -459,7 +449,7 @@ def render_conversation():
     else:
         st.info("📝 No chat history yet. Start a conversation above!")
 
-# Add contact page
+# Add contact page (keep this as it is, it should be working fine)
 def render_add_contact():
     if st.session_state.page != "add_contact":
         return
@@ -476,7 +466,7 @@ def render_add_contact():
         context_selected_index = context_options.index(st.session_state.add_contact_context_select) if st.session_state.add_contact_context_select in context_options else 0
 
         context = st.selectbox("Relationship", context_options,
-                              index=context_selected_index, # Ensure index is valid
+                              index=context_selected_index,
                               format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}",
                               key="add_contact_context_select")
 
@@ -492,12 +482,11 @@ def render_add_contact():
                 }
                 st.success(f"Added {name_to_add}")
                 st.session_state.page = "contacts"
-                # Clear the form fields after submission
                 st.session_state.add_contact_name_input = ""
-                st.session_state.add_contact_context_select = list(CONTEXTS.keys())[0] # Reset to first option
+                st.session_state.add_contact_context_select = list(CONTEXTS.keys())[0]
                 st.rerun()
 
-# Main app
+# Main app (keep this as it is)
 def main():
     st.set_page_config(page_title="The Third Voice", layout="wide")
     initialize_session()
@@ -516,4 +505,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
