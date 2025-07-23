@@ -112,9 +112,11 @@ def initialize_session():
         "contacts": load_contacts_and_history(),
         "page": "contacts",
         "active_contact": None,
-        "user_input": "",
-        "clear_input": False,
-        "edit_contact": None
+        # "user_input": "", # No longer directly managing this as a session_state key for value
+        # "clear_input": False, # Will handle clearing more directly
+        "edit_contact": None,
+        "conversation_input_text": "", # Initialize input text for conversation
+        "edit_contact_name_input": "", # Initialize for edit contact form
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -181,7 +183,8 @@ def process_message(contact_name, message, context):
                 "timestamp": datetime.datetime.now().timestamp(),
                 "model": MODEL
             }
-            st.session_state.clear_input = True
+            # Instead of setting clear_input, we directly set the session state key for the text area
+            st.session_state.conversation_input_text = "" # Clear input after processing
 
         except Exception as e:
             st.error(f"Failed to process message: {e}")
@@ -225,18 +228,21 @@ def render_first_time_screen():
 
     with st.form("add_custom_contact"):
         st.markdown("**Or add a custom contact:**")
-        name = st.text_input("Name", placeholder="Sarah, Mom, Dad...")
-        context = st.selectbox("Relationship", list(CONTEXTS.keys()), format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}")
+        name = st.text_input("Name", placeholder="Sarah, Mom, Dad...", key="new_contact_name_input") # Added key
+        context = st.selectbox("Relationship", list(CONTEXTS.keys()), format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}", key="new_contact_context_select") # Added key
 
         if st.form_submit_button("Add Custom Contact"):
-            if name.strip() and save_contact(name, context):
-                st.session_state.contacts[name] = {
-                    "context": context,
+            # Get values directly from session state via keys
+            name_to_add = st.session_state.new_contact_name_input
+            context_to_add = st.session_state.new_contact_context_select
+            if name_to_add.strip() and save_contact(name_to_add, context_to_add):
+                st.session_state.contacts[name_to_add] = {
+                    "context": context_to_add,
                     "history": [],
                     "created_at": datetime.datetime.now().isoformat(),
                     "id": None
                 }
-                st.session_state.active_contact = name
+                st.session_state.active_contact = name_to_add
                 st.session_state.page = "conversation"
                 st.rerun()
 
@@ -247,33 +253,26 @@ def render_contact_list():
 
     st.markdown("### 🎙️ The Third Voice")
 
-    # Use a container to group buttons and potentially add custom CSS for less spacing
-    # For closer packing, we can just remove the "---" and rely on Streamlit's default button spacing.
-    # The `st.button` itself will still be a block element, but we can make its content more compact.
-
     for name, data in sorted(st.session_state.contacts.items(),
                            key=lambda x: x[1]["history"][-1]["time"] if x[1]["history"] else x[1]["created_at"],
                            reverse=True):
-        # We no longer need 'context' icon/description on this page.
-        # context = CONTEXTS.get(data["context"], CONTEXTS["family"]) # Not used here
         last_msg = data["history"][-1] if data["history"] else None
         preview = f"{last_msg['original'][:40]}..." if last_msg and last_msg['original'] else "Start chatting!" # Shorten preview
         time_str = last_msg["time"] if last_msg else "New"
 
-        # Display name and a short preview/timestamp
         if st.button(
-            f"**{name}** | {time_str}\n" # Simplified top line
-            f"_{preview}_", # Italicized preview
+            f"**{name}** | {time_str}\n"
+            f"_{preview}_",
             key=f"contact_{name}",
-            use_container_width=True # Still use full width for clickability
+            use_container_width=True
         ):
             st.session_state.active_contact = name
             st.session_state.page = "conversation"
+            # When switching to conversation, ensure the text input is cleared
+            st.session_state.conversation_input_text = ""
             st.rerun()
 
-        # Removed st.markdown("---") to reduce vertical spacing
-
-    st.markdown("---") # Keep one separator before the add new contact button
+    st.markdown("---")
 
     if st.button("➕ Add New Contact", use_container_width=True):
         st.session_state.page = "add_contact"
@@ -292,17 +291,33 @@ def render_edit_contact():
         st.session_state.edit_contact = None
         st.rerun()
 
+    # Initialize the input field's session state if it's not already set
+    # This prevents the flashing by giving it a stable initial value
+    if "edit_contact_name_input" not in st.session_state or st.session_state.edit_contact_name_input == "":
+        st.session_state.edit_contact_name_input = contact["name"]
+
     with st.form("edit_contact_form"):
-        name = st.text_input("Name", value=contact["name"], placeholder="Sarah, Mom, Dad...")
+        # Use session state directly for value, and on_change to update the actual contact name
+        name_input = st.text_input("Name",
+                                   value=st.session_state.edit_contact_name_input, # Stable value
+                                   key="edit_contact_name_input") # This key stores the current value
+
         context = st.selectbox("Relationship", list(CONTEXTS.keys()),
                              index=list(CONTEXTS.keys()).index(contact["context"]),
-                             format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}")
+                             format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}",
+                             key="edit_contact_context_select")
 
         col1, col2 = st.columns(2)
         with col1:
             if st.form_submit_button("💾 Save Changes"):
-                if name.strip() and save_contact(name, context, contact["id"]):
-                    st.success(f"Updated {name}")
+                # Use the value from the session state key
+                new_name = st.session_state.edit_contact_name_input
+                new_context = st.session_state.edit_contact_context_select
+                if new_name.strip() and save_contact(new_name, new_context, contact["id"]):
+                    st.success(f"Updated {new_name}")
+                    # Update active contact name if it changed
+                    if st.session_state.active_contact == contact["name"]:
+                        st.session_state.active_contact = new_name
                     st.session_state.page = "conversation"
                     st.session_state.edit_contact = None
                     st.rerun()
@@ -310,8 +325,9 @@ def render_edit_contact():
         with col2:
             if st.form_submit_button("🗑️ Delete Contact"):
                 if delete_contact(contact["id"]):
-                    st.success(f"Deleted contact: {name}")
+                    st.success(f"Deleted contact: {contact['name']}")
                     st.session_state.page = "contacts"
+                    st.session_state.active_contact = None # No active contact after deletion
                     st.session_state.edit_contact = None
                     st.rerun()
 
@@ -343,26 +359,24 @@ def render_conversation():
                 "name": contact_name,
                 "context": context
             }
+            # Pre-fill the edit contact name input when going to edit page
+            st.session_state.edit_contact_name_input = contact_name
             st.session_state.page = "edit_contact"
             st.rerun()
 
     st.markdown("---")
     st.markdown("#### 💭 Your Input")
-    input_value = "" if st.session_state.get("clear_input", False) else st.session_state.get("conversation_input_value", "")
 
+    # The key "conversation_input_text" is crucial here.
+    # Streamlit will automatically manage its value in session_state.
+    # We only set `value` initially, or when we want to clear it (like after a submit).
     user_input = st.text_area(
         "What's happening?",
-        value=input_value,
-        key="conversation_input",
+        value=st.session_state.conversation_input_text, # Use session state for initial value
+        key="conversation_input_text", # This key automatically stores/retrieves the current input
         placeholder="Share their message or your response...",
         height=120
     )
-
-    if st.session_state.get("clear_input", False):
-        st.session_state.clear_input = False
-        st.session_state.conversation_input_value = ""
-    else:
-        st.session_state.conversation_input_value = user_input
 
     col1, col2 = st.columns([3, 1])
     with col1:
@@ -372,10 +386,12 @@ def render_conversation():
             if last_response_key in st.session_state:
                 del st.session_state[last_response_key]
             process_message(contact_name, user_input, context)
+            # The process_message function now handles clearing st.session_state.conversation_input_text
             st.rerun()
     with col2:
-        if st.button("🗑️ Clear", key="clear_input_btn", use_container_width=True):
-            st.session_state.clear_input = True
+        if st.button("🗑️️ Clear", key="clear_input_btn", use_container_width=True):
+            # Directly set the session state variable for the text area to clear it
+            st.session_state.conversation_input_text = ""
             st.rerun()
 
     st.markdown("---")
@@ -384,7 +400,9 @@ def render_conversation():
     last_response_key = f"last_response_{contact_name}"
     if last_response_key in st.session_state:
         last_resp = st.session_state[last_response_key]
-        if datetime.datetime.now().timestamp() - last_resp["timestamp"] < 60:
+        # Check if response is recent (e.g., within last 5 minutes) to keep it displayed
+        # You might adjust this timestamp logic based on desired persistence
+        if datetime.datetime.now().timestamp() - last_resp["timestamp"] < 300: # 5 minutes
             with st.container():
                 st.markdown("**AI Guidance:**")
                 st.text_area(
@@ -410,6 +428,8 @@ def render_conversation():
                     st.balloons()
         else:
             st.info("💭 Your AI response will appear here after you click Transform")
+            # Optionally clear the old response from session state if it's too old
+            # del st.session_state[last_response_key]
     else:
         st.info("💭 Your AI response will appear here after you click Transform")
 
@@ -455,20 +475,28 @@ def render_add_contact():
         st.rerun()
 
     with st.form("add_contact_form"):
-        name = st.text_input("Name", placeholder="Sarah, Mom, Dad...")
+        # Use a key, and let Streamlit handle the value.
+        # Initialize it to empty string in initialize_session.
+        name = st.text_input("Name", placeholder="Sarah, Mom, Dad...", key="add_contact_name_input")
         context = st.selectbox("Relationship", list(CONTEXTS.keys()),
-                              format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}")
+                              format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}",
+                              key="add_contact_context_select")
 
         if st.form_submit_button("Add Contact"):
-            if name.strip() and save_contact(name, context):
-                st.session_state.contacts[name] = {
-                    "context": context,
+            name_to_add = st.session_state.add_contact_name_input
+            context_to_add = st.session_state.add_contact_context_select
+            if name_to_add.strip() and save_contact(name_to_add, context_to_add):
+                st.session_state.contacts[name_to_add] = {
+                    "context": context_to_add,
                     "history": [],
                     "created_at": datetime.datetime.now().isoformat(),
                     "id": None
                 }
-                st.success(f"Added {name}")
+                st.success(f"Added {name_to_add}")
                 st.session_state.page = "contacts"
+                # Clear the form fields after submission
+                st.session_state.add_contact_name_input = ""
+                st.session_state.add_contact_context_select = list(CONTEXTS.keys())[0] # Reset to first option
                 st.rerun()
 
 # Main app
@@ -479,7 +507,6 @@ def main():
     if not st.session_state.contacts:
         render_first_time_screen()
     else:
-        # We need to explicitly call render_contact_list and other renders based on page
         if st.session_state.page == "contacts":
             render_contact_list()
         elif st.session_state.page == "edit_contact":
@@ -491,3 +518,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
