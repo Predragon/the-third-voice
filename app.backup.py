@@ -1,337 +1,600 @@
 import streamlit as st
-import json
 import datetime
 import requests
+from supabase import create_client
 
 # Constants
-CONTEXTS = ["romantic", "coparenting", "workplace", "family", "friend"]
-REQUIRE_TOKEN = False
+CONTEXTS = {
+    "romantic": {"icon": "💕", "description": "Partner & intimate relationships"},
+    "coparenting": {"icon": "👨‍👩‍👧‍👦", "description": "Raising children together"},
+    "workplace": {"icon": "🏢", "description": "Professional relationships"},
+    "family": {"icon": "🏠", "description": "Extended family connections"},
+    "friend": {"icon": "🤝", "description": "Friendships & social bonds"}
+}
+
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
+MODEL = "google/gemma-2-9b-it:free"  # Your model name
 
-# CSS Styles (Cleaner, no red tones)
-st.markdown("""
-<style>
-.contact-card {background:rgba(76,175,80,0.1);padding:0.8rem;border-radius:8px;border-left:4px solid #4CAF50;margin:0.5rem 0;cursor:pointer}
-.ai-response {background:rgba(76,175,80,0.1);padding:1rem;border-radius:8px;border-left:4px solid #4CAF50;margin:0.5rem 0}
-.user-msg {background:rgba(33,150,243,0.1);padding:0.8rem;border-radius:8px;border-left:4px solid #2196F3;margin:0.3rem 0}
-.contact-msg {background:rgba(255,193,7,0.1);padding:0.8rem;border-radius:8px;border-left:4px solid #FFC107;margin:0.3rem 0}
-.pos {background:rgba(76,175,80,0.2);padding:0.5rem;border-radius:5px;margin:0.2rem 0}
-.neu {background:rgba(33,150,243,0.2);padding:0.5rem;border-radius:5px;margin:0.2rem 0}
-.journal-section {background:rgba(156,39,176,0.1);padding:1rem;border-radius:8px;margin:0.5rem 0}
-.main-actions {display:flex;gap:1rem;margin:1rem 0}
-.main-actions button {flex:1;padding:0.8rem;font-size:1.1rem}
-.feedback-section {background:rgba(0,150,136,0.1);padding:1rem;border-radius:8px;margin:1rem 0}
-</style>
-""", unsafe_allow_html=True)
+# Initialize Supabase
+@st.cache_resource
+def init_supabase():
+    try:
+        return create_client(st.secrets["supabase"]["url"], st.secrets["supabase"]["key"])
+    except Exception as e:
+        st.error(f"Supabase initialization failed: {e}")
+        return None
 
-# Initialize Session State
+supabase = init_supabase()
+
+# Load data
+@st.cache_data(ttl=60)
+def load_contacts_and_history():
+    if not supabase:
+        return {}
+    try:
+        contacts_data = {c["name"]: {
+            "context": c["context"],
+            "history": [],
+            "created_at": c.get("created_at", datetime.datetime.now().isoformat()),
+            "id": c.get("id")
+        } for c in supabase.table("contacts").select("*").execute().data}
+
+        messages = supabase.table("messages").select("*").order("timestamp").execute().data
+        for msg in messages:
+            contact_name = msg["contact_name"]
+            if contact_name not in contacts_data:
+                contacts_data[contact_name] = {
+                    "context": "family",  # Default context if message exists but contact doesn't
+                    "history": [],
+                    "created_at": datetime.datetime.now().isoformat(),
+                    "id": None  # Will need to be updated if contact is later saved
+                }
+            contacts_data[contact_name]["history"].append({
+                "id": f"{msg['type']}_{msg['timestamp']}",
+                "time": datetime.datetime.fromisoformat(msg["timestamp"]).strftime("%m/%d %H:%M"),
+                "type": msg["type"],
+                "original": msg["original"],
+                "result": msg["result"],
+                "healing_score": msg.get("healing_score", 0),
+                "model": msg.get("model", "Unknown")
+            })
+        return contacts_data
+    except Exception as e:
+        st.warning(f"Could not load data: {e}")
+        return {}
+
+# Save data
+def save_contact(name, context, contact_id=None):
+    if not supabase or not name.strip():
+        return False
+    try:
+        contact_data = {"name": name, "context": context}
+        if contact_id:
+            supabase.table("contacts").update(contact_data).eq("id", contact_id).execute()
+        else:
+            contact_data["created_at"] = datetime.datetime.now().isoformat()
+            supabase.table("contacts").insert(contact_data).execute()
+        st.cache_data.clear()
+        return True
+    except Exception as e:
+        st.error(f"Error saving contact: {e}")
+        return False
+
+def delete_contact(contact_id):
+    if not supabase or not contact_id:
+        return False
+    try:
+        # Get contact name before deleting contact, to delete associated messages
+        contact_name_data = supabase.table("contacts").select("name").eq("id", contact_id).execute().data
+        if contact_name_data:
+            contact_name = contact_name_data[0]["name"]
+            supabase.table("messages").delete().eq("contact_name", contact_name).execute()
+            # Clear last response from session state
+            if f"last_response_{contact_name}" in st.session_state:
+                del st.session_state[f"last_response_{contact_name}"]
+
+        supabase.table("contacts").delete().eq("id", contact_id).execute()
+        st.cache_data.clear()
+        return True
+    except Exception as e:
+        st.error(f"Error deleting contact: {e}")
+        return False
+
+def save_message(contact, message_type, original, result, emotional_state, healing_score, model_used):
+    if not supabase:
+        return False
+    try:
+        supabase.table("messages").insert({
+            "contact_name": contact, "type": message_type, "original": original, "result": result,
+            "emotional_state": emotional_state, "healing_score": healing_score,
+            "timestamp": datetime.datetime.now().isoformat(), "model": model_used
+        }).execute()
+        st.cache_data.clear()
+        return True
+    except Exception as e:
+        st.error(f"Error saving message: {e}")
+        return False
+
+# Initialize session state
 def initialize_session():
     defaults = {
-        'token_validated': not REQUIRE_TOKEN,
-        'api_key': st.secrets.get("OPENROUTER_API_KEY", ""),
-        'contacts': {context: {'context': context, 'history': []} for context in CONTEXTS},
-        'active_contact': CONTEXTS[0],
-        'journal_entries': {},
-        'feedback_data': {},
-        'user_stats': {'total_messages': 0, 'coached_messages': 0, 'translated_messages': 0},
-        'active_mode': None
+        "contacts": load_contacts_and_history(),
+        "page": "contacts",
+        "active_contact": None,
+        "edit_contact": None,
+        "conversation_input_text": "",
+        "clear_conversation_input": False,  # Flag to control input clearing
+        "edit_contact_name_input": "",
+        "add_contact_name_input": "",
+        "add_contact_context_select": list(CONTEXTS.keys())[0],
+        "last_error_message": None,
     }
     for key, value in defaults.items():
-        st.session_state.setdefault(key, value)
+        if key not in st.session_state:
+            st.session_state[key] = value
 
 initialize_session()
 
-# Token Validation
-def validate_token():
-    if REQUIRE_TOKEN and not st.session_state.token_validated:
-        st.markdown("# 🎙️ The Third Voice\n*Your AI Communication Coach*")
-        st.warning("🔐 Access restricted. Enter beta token to continue.")
-        token = st.text_input("Token:", type="password")
-        if st.button("Validate"):
-            if token in ["ttv-beta-001", "ttv-beta-002", "ttv-beta-003"]:
-                st.session_state.token_validated = True
-                st.success("✅ Authorized")
-                st.rerun()
-            else:
-                st.error("Invalid token")
-        st.stop()
+# Process message
+def process_message(contact_name, message, context):
+    st.session_state.last_error_message = None
 
-validate_token()
-
-# API Interaction with Rate Limit Fallback
-def get_ai_response(message, context, is_received=False):
-    if not st.session_state.api_key:
-        return {"error": "No API key"}
-
-    prompts = {
-    "romantic": "You are an emotionally intelligent communication coach specializing in romantic relationships. We are responding to my partner. Strictly reframe this message with empathy, clarity, and intimacy, avoiding blame or narrative detours, and always suggest a positive next step to maintain connection. Do not generate stories or ask for additional context.",
-    "coparenting": "You offer emotionally safe responses for coparenting focused on the children's wellbeing.",
-    "workplace": "You translate workplace messages for professional tone and clear intent.",
-    "family": "You understand family dynamics and help rephrase for better family relationships.",
-    "friend": "You assist with friendship communication to strengthen bonds and resolve conflicts."
-    }
-
-    system_prompt = f"{prompts.get(context, prompts['family'])} {'Analyze this received message and suggest how to respond.' if is_received else 'Improve this message before sending.'}"
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": f"Message: {message}"}
-    ]
-
-    models = [
-        "google/gemma-2-9b-it:free",
-        "meta-llama/llama-3.2-3b-instruct:free",
-        "microsoft/phi-3-mini-128k-instruct:free"
-    ]
-
-    for model in models:
-        try:
-            response = requests.post(
-                API_URL,
-                headers={"Authorization": f"Bearer {st.session_state.api_key}"},
-                json={"model": model, "messages": messages},
-                timeout=30
-            )
-            response.raise_for_status()
-            reply = response.json()["choices"][0]["message"]["content"]
-            model_name = model.split("/")[-1].replace(":free", "").replace("-", " ").title()
-
-            return {
-                "type": "translate" if is_received else "coach",
-                "sentiment": "neutral" if is_received else "improved",
-                "meaning": f"Interpretation: {reply[:100]}..." if is_received else None,
-                "response": reply if is_received else None,
-                "original": message if not is_received else None,
-                "improved": reply if not is_received else None,
-                "model": model_name
-            }
-        except Exception as e:
-            continue
-
-    # Fallback for rate limit or API issues
-    return {"error": "API limit reached. Please try again later or contact hello@thethirdvoice.ai for support."}
-
-# Sidebar: Context Management
-def render_sidebar():
-    st.sidebar.markdown("### 👥 Your Contexts")
-    with st.sidebar.expander("➕ Add Custom Contact"):
-        new_name = st.text_input("Name:")
-        new_context = st.selectbox("Relationship:", CONTEXTS)
-        if st.button("Add") and new_name and new_name not in st.session_state.contacts:
-            st.session_state.contacts[new_name] = {'context': new_context, 'history': []}
-            st.session_state.active_contact = new_name
-            st.success(f"Added {new_name}")
-            st.rerun()
-
-    contact_names = list(st.session_state.contacts.keys())
-    if contact_names:
-        selected = st.sidebar.radio("Select Context:", contact_names, index=contact_names.index(st.session_state.active_contact))
-        st.session_state.active_contact = selected
-
-    contact = st.session_state.contacts[st.session_state.active_contact]
-    st.sidebar.markdown(f"**Context:** {contact['context']}\n**Messages:** {len(contact['history'])}")
-
-    if st.sidebar.button("🗑️ Delete Contact") and st.session_state.active_contact not in CONTEXTS:
-        del st.session_state.contacts[st.session_state.active_contact]
-        st.session_state.active_contact = CONTEXTS[0]
-        st.rerun()
-
-    st.sidebar.markdown("---\n### 💾 Data Management")
-    uploaded = st.sidebar.file_uploader("📤 Load History", type="json", key="file_uploader")
-    if uploaded:
-        try:
-            data = json.load(uploaded)
-            st.session_state.contacts = data.get('contacts', {context: {'context': context, 'history': []} for context in CONTEXTS})
-            st.session_state.journal_entries = data.get('journal_entries', {})
-            st.session_state.feedback_data = data.get('feedback_data', {})
-            if st.session_state.active_contact not in st.session_state.contacts:
-                st.session_state.active_contact = CONTEXTS[0]
-            st.sidebar.success("✅ Data loaded!")
-            st.session_state['file_uploader'] = None
-            st.rerun()
-        except Exception as e:
-            st.sidebar.error(f"❌ Invalid file: {str(e)}")
-
-    if st.sidebar.button("💾 Save All"):
-        save_data = {
-            'contacts': st.session_state.contacts,
-            'journal_entries': st.session_state.journal_entries,
-            'feedback_data': st.session_state.feedback_data,
-            'saved_at': datetime.datetime.now().isoformat()
-        }
-        filename = f"third_voice_{datetime.datetime.now().strftime('%m%d_%H%M')}.json"
-        st.sidebar.download_button("📥 Download File", json.dumps(save_data, indent=2), filename, "application/json", use_container_width=True)
-
-render_sidebar()
-
-# Main UI
-def render_main():
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        try:
-            st.image("logo.svg")
-        except:
-            st.markdown("# 🎙️ The Third Voice")
-        st.markdown("<div style='text-align: center'><i>Built for families</i></div>", unsafe_allow_html=True)
-
-    st.markdown(f"### 💬 Context: **{st.session_state.active_contact}**")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("📤 Refine My Words", type="primary", use_container_width=True):
-            st.session_state.active_mode = "coach"
-            st.rerun()
-    with col2:
-        if st.button("📥 Decode Their Heart", type="primary", use_container_width=True):
-            st.session_state.active_mode = "translate"
-            st.rerun()
-
-render_main()
-
-# Message Processing
-def render_message_input():
-    if not st.session_state.active_mode:
+    if not message.strip():
+        st.session_state.last_error_message = "Input message cannot be empty. Please type something to transform."
         return
 
-    mode = st.session_state.active_mode
-    if st.button("← Back"):
-        st.session_state.active_mode = None
+    is_incoming = any(indicator in message.lower() for indicator in ["said:", "wrote:", "texted:", "told me:"])
+    mode = "translate" if is_incoming else "coach"
+
+    system_prompt = (
+        f"You are a compassionate relationship guide helping with a {context} relationship with {contact_name}. "
+        f"{'Understand what they mean and suggest a loving response.' if is_incoming else 'Reframe their message to be constructive and loving.'} "
+        "Keep it concise, insightful, and actionable (2-3 paragraphs)."
+    )
+
+    try:
+        with st.spinner("🤖 Processing..."):
+            response = requests.post(
+                API_URL,
+                headers={"Authorization": f"Bearer {st.secrets.get('openrouter', {}).get('api_key', '')}"},
+                json={
+                    "model": MODEL,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": message}
+                    ],
+                    "temperature": 0.7,
+                    "max_tokens": 500
+                },
+                timeout=25
+            ).json()["choices"][0]["message"]["content"].strip()
+
+        healing_score = 5 + (1 if len(response) > 200 else 0) + min(2, sum(1 for word in ["understand", "love", "connect", "care"] if word in response.lower()))
+        healing_score = min(10, healing_score)
+
+        new_message = {
+            "id": f"{mode}_{datetime.datetime.now().timestamp()}",
+            "time": datetime.datetime.now().strftime("%m/%d %H:%M"),
+            "type": mode,
+            "original": message,
+            "result": response,
+            "healing_score": healing_score,
+            "model": MODEL
+        }
+
+        if contact_name not in st.session_state.contacts:
+            st.session_state.contacts[contact_name] = {
+                "context": "family",
+                "history": [],
+                "created_at": datetime.datetime.now().isoformat(),
+                "id": None
+            }
+
+        st.session_state.contacts[contact_name]["history"].append(new_message)
+        save_message(contact_name, mode, message, response, "calm", healing_score, MODEL)
+        st.session_state[f"last_response_{contact_name}"] = {
+            "response": response,
+            "healing_score": healing_score,
+            "timestamp": datetime.datetime.now().timestamp(),
+            "model": MODEL
+        }
+        st.session_state.clear_conversation_input = True  # Set flag to clear input on next render
+
+    except requests.exceptions.Timeout:
+        st.session_state.last_error_message = "API request timed out. Please try again. The AI might be busy."
+    except requests.exceptions.ConnectionError:
+        st.session_state.last_error_message = "Connection error. Please check your internet connection."
+    except requests.exceptions.RequestException as e:
+        st.session_state.last_error_message = f"Network or API error: {e}. Please check your API key or connection."
+    except (KeyError, IndexError) as e:
+        st.session_state.last_error_message = f"Received an unexpected response from the AI API. Error: {e}"
+    except Exception as e:
+        st.session_state.last_error_message = f"An unexpected error occurred: {e}"
+
+# First time user screen
+def render_first_time_screen():
+    st.markdown("### 🎙️ Welcome to The Third Voice")
+    st.markdown("Choose a relationship type to get started, or add a custom contact:")
+
+    cols = st.columns(2)
+    contexts = list(CONTEXTS.items())
+
+    for i, (context_key, context_info) in enumerate(contexts):
+        with cols[i % 2]:
+            if st.button(
+                f"{context_info['icon']} {context_key.title()}\n{context_info['description']}",
+                key=f"context_{context_key}",
+                use_container_width=True
+            ):
+                default_names = {
+                    "romantic": "Partner",
+                    "coparenting": "Co-parent",
+                    "workplace": "Colleague",
+                    "family": "Family Member",
+                    "friend": "Friend"
+                }
+                contact_name = default_names.get(context_key, context_key.title())
+
+                # Check if contact already exists before saving to avoid duplicates in this flow
+                if contact_name not in st.session_state.contacts:
+                    if save_contact(contact_name, context_key):
+                        # Reload contacts to get the ID from Supabase for the newly added contact
+                        st.session_state.contacts = load_contacts_and_history()
+                        st.session_state.active_contact = contact_name
+                        st.session_state.page = "conversation"
+                        st.rerun()
+                else:
+                    st.session_state.active_contact = contact_name
+                    st.session_state.page = "conversation"
+                    st.rerun()
+
+    st.markdown("---")
+
+    with st.form("add_custom_contact_first_time"):
+        st.markdown("**Or add a custom contact:**")
+        name = st.text_input("Name", placeholder="Sarah, Mom, Dad...", key="first_time_new_contact_name_input")
+        context = st.selectbox("Relationship", list(CONTEXTS.keys()), format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}", key="first_time_new_contact_context_select")
+
+        if st.form_submit_button("Add Custom Contact"):
+            name_to_add = st.session_state.first_time_new_contact_name_input
+            context_to_add = st.session_state.first_time_new_contact_context_select
+            if name_to_add.strip():
+                if name_to_add not in st.session_state.contacts:  # Prevent adding duplicate names
+                    if save_contact(name_to_add, context_to_add):
+                        st.session_state.contacts = load_contacts_and_history()  # Reload to get ID
+                        st.session_state.active_contact = name_to_add
+                        st.session_state.page = "conversation"
+                        st.rerun()
+                    else:
+                        st.session_state.last_error_message = "Failed to add contact. Please try again."
+                else:
+                    st.session_state.last_error_message = "Contact with this name already exists."
+                    st.rerun()
+            else:
+                st.session_state.last_error_message = "Contact name cannot be empty."
+                st.rerun()
+
+# Contact list
+def render_contact_list():
+    if st.session_state.page != "contacts":
+        return
+
+    st.markdown("### 🎙️ The Third Voice")
+
+    # Sort contacts by last message time if available, otherwise by creation time
+    sorted_contacts = sorted(
+        st.session_state.contacts.items(),
+        key=lambda x: x[1]["history"][-1]["time"] if x[1]["history"] else x[1]["created_at"],
+        reverse=True
+    )
+
+    for name, data in sorted_contacts:
+        last_msg = data["history"][-1] if data["history"] else None
+        preview = f"{last_msg['original'][:40]}..." if last_msg and last_msg['original'] else "Start chatting!"
+        time_str = last_msg["time"] if last_msg else "New"
+
+        if st.button(
+            f"**{name}** | {time_str}\n"
+            f"_{preview}_",
+            key=f"contact_{name}",
+            use_container_width=True
+        ):
+            st.session_state.active_contact = name
+            st.session_state.page = "conversation"
+            st.session_state.conversation_input_text = ""
+            st.session_state.clear_conversation_input = False
+            st.session_state.last_error_message = None
+            st.rerun()
+
+    st.markdown("---")
+
+    if st.button("➕ Add New Contact", use_container_width=True):
+        st.session_state.page = "add_contact"
         st.rerun()
 
-    input_class = "user-msg" if mode == "coach" else "contact-msg"
-    st.markdown(f'<div class="{input_class}"><strong>{"📤 Your message to send:" if mode == "coach" else "📥 Message you received:"}</strong></div>', unsafe_allow_html=True)
+# Edit contact page with delete option
+def render_edit_contact():
+    if st.session_state.page != "edit_contact" or not st.session_state.edit_contact:
+        return
 
-    message = st.text_area("", height=120, key=f"{mode}_input", label_visibility="collapsed",
-                           placeholder="Type your message here..." if mode == "coach" else "Paste their message here...")
+    contact = st.session_state.edit_contact
+    st.markdown(f"### ✏️ Edit Contact: {contact['name']}")
+
+    if st.button("← Back", key="back_to_conversation", use_container_width=True):
+        st.session_state.page = "conversation"
+        st.session_state.edit_contact = None
+        st.session_state.last_error_message = None
+        st.session_state.clear_conversation_input = False
+        st.rerun()
+
+    # Initialize or reset the input field value when entering edit mode
+    if "edit_contact_name_input" not in st.session_state or st.session_state.edit_contact_name_input == "":
+        st.session_state.edit_contact_name_input = contact["name"]
+    elif st.session_state.edit_contact_name_input != contact["name"] and st.session_state.edit_contact_name_input == st.session_state.get('initial_edit_contact_name', ''):
+        st.session_state.edit_contact_name_input = contact["name"]
+
+    # Store initial name to detect changes later if needed
+    if 'initial_edit_contact_name' not in st.session_state:
+        st.session_state.initial_edit_contact_name = contact["name"]
+    elif st.session_state.initial_edit_contact_name != contact["name"]:
+        st.session_state.initial_edit_contact_name = contact["name"]
+        st.session_state.edit_contact_name_input = contact["name"]
+
+    with st.form("edit_contact_form"):
+        name_input = st.text_input("Name",
+                                   value=st.session_state.edit_contact_name_input,
+                                   key="edit_contact_name_input_widget")
+
+        context_options = list(CONTEXTS.keys())
+        initial_context_index = context_options.index(contact["context"]) if contact["context"] in context_options else 0
+        context = st.selectbox("Relationship", context_options,
+                               index=initial_context_index,
+                               format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}",
+                               key="edit_contact_context_select")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.form_submit_button("💾 Save Changes"):
+                new_name = st.session_state.edit_contact_name_input_widget
+                new_context = st.session_state.edit_contact_context_select
+
+                if not new_name.strip():
+                    st.error("Contact name cannot be empty.")
+                    st.rerun()
+
+                # Check for duplicate name if name changed
+                if new_name != contact["name"] and new_name in st.session_state.contacts:
+                    st.error(f"Contact with name '{new_name}' already exists.")
+                    st.rerun()
+
+                if save_contact(new_name, new_context, contact["id"]):
+                    st.success(f"Updated {new_name}")
+                    # Update active contact if the name changed
+                    if st.session_state.active_contact == contact["name"]:
+                        st.session_state.active_contact = new_name
+                    st.session_state.page = "conversation"
+                    st.session_state.edit_contact = None
+                    st.session_state.last_error_message = None
+                    st.session_state.edit_contact_name_input = ""
+                    st.session_state.initial_edit_contact_name = ""
+                    st.session_state.clear_conversation_input = False
+                    st.rerun()
+
+        with col2:
+            if st.form_submit_button("🗑️ Delete Contact"):
+                if delete_contact(contact["id"]):
+                    st.success(f"Deleted contact: {contact['name']}")
+                    st.session_state.page = "contacts"
+                    st.session_state.active_contact = None
+                    st.session_state.edit_contact = None
+                    st.session_state.last_error_message = None
+                    st.session_state.clear_conversation_input = False
+                    st.rerun()
+
+# Conversation screen with edit button
+def render_conversation():
+    if st.session_state.page != "conversation" or not st.session_state.active_contact:
+        return
+
+    contact_name = st.session_state.active_contact
+    contact_data = st.session_state.contacts.get(contact_name, {"context": "family", "history": [], "id": None})
+    context = contact_data["context"]
+    history = contact_data["history"]
+    contact_id = contact_data.get("id")
+
+    st.markdown(f"### {CONTEXTS[context]['icon']} {contact_name} - {CONTEXTS[context]['description']}")
+
+    back_col, edit_col, _ = st.columns([2, 2, 6])
+
+    with back_col:
+        if st.button("← Back", key="back_btn", use_container_width=True):
+            st.session_state.page = "contacts"
+            st.session_state.active_contact = None
+            st.session_state.last_error_message = None
+            st.session_state.clear_conversation_input = False
+            st.rerun()
+
+    with edit_col:
+        if st.button("✏️ Edit", key="edit_current_contact", use_container_width=True):
+            st.session_state.edit_contact = {
+                "id": contact_id,
+                "name": contact_name,
+                "context": context
+            }
+            st.session_state.edit_contact_name_input = contact_name
+            st.session_state.initial_edit_contact_name = contact_name
+            st.session_state.page = "edit_contact"
+            st.session_state.last_error_message = None
+            st.session_state.clear_conversation_input = False
+            st.rerun()
+
+    st.markdown("---")
+    st.markdown("#### 💭 Your Input")
+
+    # Determine the text area value based on clear_conversation_input
+    input_value = "" if st.session_state.clear_conversation_input else st.session_state.get("conversation_input_text", "")
+
+    user_input_area = st.text_area(
+        "What's happening?",
+        value=input_value,
+        key="conversation_input_text",
+        placeholder="Share their message or your response...",
+        height=120
+    )
+
+    # Reset the clear flag after rendering the text area
+    if st.session_state.clear_conversation_input:
+        st.session_state.clear_conversation_input = False
 
     col1, col2 = st.columns([3, 1])
     with col1:
-        process_btn = st.button(f"{'🚀 Refine My Words' if mode == 'coach' else '🔍 Decode Their Heart'}", type="secondary")
+        if st.button("✨ Transform", key="transform_message", use_container_width=True):
+            input_message = st.session_state.conversation_input_text
+            process_message(contact_name, input_message, context)
+            st.rerun()
     with col2:
-        if st.button("Clear", type="secondary"):
-            st.session_state[f"{mode}_input"] = ""
+        if st.button("🗑️️ Clear", key="clear_input_btn", use_container_width=True):
+            st.session_state.conversation_input_text = ""
+            st.session_state.clear_conversation_input = False
+            st.session_state.last_error_message = None
             st.rerun()
 
-    if process_btn and message.strip():
-        with st.spinner("🎙️ The Third Voice is analyzing..."):
-            contact = st.session_state.contacts[st.session_state.active_contact]
-            result = get_ai_response(message, contact['context'], mode == "translate")
+    # Display persistent error message here
+    if st.session_state.last_error_message:
+        st.error(st.session_state.last_error_message)
 
-            if "error" not in result:
-                st.markdown("### 🎙️ The Third Voice says:")
-                if mode == "coach":
-                    st.markdown(f'<div class="ai-response"><strong>✨ Your refined message:</strong><br><br>{result["improved"]}<br><br><small><i>Generated by: {result["model"]}</i></small></div>', unsafe_allow_html=True)
-                    st.session_state.user_stats['coached_messages'] += 1
-                else:
-                    st.markdown(f'<div class="ai-response"><strong>🔍 What they truly mean:</strong><br>{result["response"]}<br><br><small><i>Generated by: {result["model"]}</i></small></div>', unsafe_allow_html=True)
-                    st.session_state.user_stats['translated_messages'] += 1
+    st.markdown("---")
+    st.markdown("#### 🤖 AI Response")
 
-                history_entry = {
-                    "id": f"{mode}_{len(contact['history'])}_{datetime.datetime.now().timestamp()}",
-                    "time": datetime.datetime.now().strftime("%m/%d %H:%M"),
-                    "type": mode,
-                    "original": message,
-                    "result": result.get("improved" if mode == "coach" else "response", ""),
-                    "sentiment": result.get("sentiment", "neutral"),
-                    "model": result.get("model", "Unknown")
-                }
+    last_response_key = f"last_response_{contact_name}"
+    if last_response_key in st.session_state and st.session_state[last_response_key]:
+        last_resp = st.session_state[last_response_key]
+        if datetime.datetime.now().timestamp() - last_resp["timestamp"] < 300:  # 5 minutes
+            with st.container():
+                st.markdown("**AI Guidance:**")
+                st.text_area(
+                    "AI Guidance Output",
+                    value=last_resp['response'],
+                    height=200,
+                    key="ai_response_display",
+                    help="Click inside and Ctrl+A to select all, then Ctrl+C to copy",
+                    disabled=False,
+                    label_visibility="hidden"
+                )
 
-                contact['history'].append(history_entry)
-                st.session_state.user_stats['total_messages'] += 1
-
-                st.markdown("### 📊 Was this helpful?")
-                col1, col2, col3 = st.columns(3)
-                for idx, (label, emoji) in enumerate([("👍 Yes", "positive"), ("👌 Okay", "neutral"), ("👎 No", "negative")]):
-                    with [col1, col2, col3][idx]:
-                        if st.button(label, key=f"{emoji}_{history_entry['id']}"):
-                            st.session_state.feedback_data[history_entry['id']] = emoji
-                            st.success("Thanks for the feedback!")
-
-                st.success("✅ Saved to history")
-            else:
-                st.error(f"❌ {result['error']}")
-    elif process_btn:
-        st.warning("⚠️ Please enter a message first.")
-
-render_message_input()
-
-# Tabs
-def render_tabs():
-    tab1, tab2, tab4 = st.tabs(["📜 History", "📘 Journal", "ℹ️ About"])
-
-    with tab1:
-        st.markdown(f"### 📜 History with {st.session_state.active_contact}")
-        contact = st.session_state.contacts[st.session_state.active_contact]
-        if not contact['history']:
-            st.info(f"No messages yet with {st.session_state.active_contact}. Use the buttons above to get started!")
-        else:
-            filter_type = st.selectbox("Filter:", ["All", "Refined Messages", "Decoded Messages"])
-            filtered_history = contact['history']
-            if filter_type == "Refined Messages":
-                filtered_history = [h for h in contact['history'] if h['type'] == 'coach']
-            elif filter_type == "Decoded Messages":
-                filtered_history = [h for h in contact['history'] if h['type'] == 'translate']
-
-            for entry in reversed(filtered_history):
-                with st.expander(f"**{entry['time']}** • {entry['type'].title()} • {entry['original'][:50]}..."):
-                    if entry['type'] == 'coach':
-                        st.markdown(f'<div class="user-msg">📤 <strong>Original:</strong> {entry["original"]}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="ai-response">🎙️ <strong>Refined:</strong> {entry["result"]}<br><small><i>by {entry.get("model", "Unknown")}</i></small></div>', unsafe_allow_html=True)
+                col_score, col_model = st.columns([1, 1])
+                with col_score:
+                    if last_resp["healing_score"] >= 8:
+                        st.success(f"✨ Healing Score: {last_resp['healing_score']}/10")
                     else:
-                        st.markdown(f'<div class="contact-msg">📥 <strong>They said:</strong> {entry["original"]}</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="ai-response">🎙️ <strong>Decoded:</strong> {entry["result"]}<br><small><i>by {entry.get("model", "Unknown")}</i></small></div>', unsafe_allow_html=True)
-                    if entry.get('id') in st.session_state.feedback_data:
-                        feedback = st.session_state.feedback_data[entry['id']]
-                        emoji = {"positive": "👍", "neutral": "👌", "negative": "👎"}
-                        st.markdown(f"*Your feedback: {emoji.get(feedback, '❓')}*")
+                        st.info(f"💡 Healing Score: {last_resp['healing_score']}/10")
 
-    with tab2:
-        st.markdown(f"### 📘 Communication Journal - {st.session_state.active_contact}")
-        contact_key = st.session_state.active_contact
-        st.session_state.journal_entries.setdefault(contact_key, {
-            'what_worked': '', 'what_didnt': '', 'insights': '', 'patterns': ''
-        })
+                with col_model:
+                    st.caption(f"🤖 Model: {last_resp.get('model', 'Unknown')}")
 
-        journal = st.session_state.journal_entries[contact_key]
-        col1, col2 = st.columns(2)
+                if last_resp["healing_score"] >= 8:
+                    st.balloons()
+        else:
+            del st.session_state[last_response_key]
+            st.info("💭 Your AI response will appear here after you click Transform")
+    else:
+        st.info("💭 Your AI response will appear here after you click Transform")
 
-        with col1:
-            st.markdown('<div class="journal-section">**💚 What worked well?**</div>', unsafe_allow_html=True)
-            journal['what_worked'] = st.text_area("", value=journal['what_worked'], key=f"worked_{contact_key}", height=100, placeholder="Communication strategies that were successful...")
-            st.markdown('<div class="journal-section">**🔍 Key insights?**</div>', unsafe_allow_html=True)
-            journal['insights'] = st.text_area("", value=journal['insights'], key=f"insights_{contact_key}", height=100, placeholder="Important realizations about this relationship...")
+    st.markdown("---")
+    st.markdown("#### 📜 Conversation History")
 
-        with col2:
-            st.markdown('<div class="journal-section">**⚠️ What didn’t work?**</div>', unsafe_allow_html=True)
-            journal['what_didnt'] = st.text_area("", value=journal['what_didnt'], key=f"didnt_{contact_key}", height=100, placeholder="What caused issues or misunderstandings...")
-            st.markdown('<div class="journal-section">**📊 Patterns noticed?**</div>', unsafe_allow_html=True)
-            journal['patterns'] = st.text_area("", value=journal['patterns'], key=f"patterns_{contact_key}", height=100, placeholder="Communication patterns you've observed...")
+    if history:
+        st.markdown(f"**Recent Messages** ({len(history)} total)")
 
-    with tab4:
-        st.markdown("""
-        ### ℹ️ About The Third Voice
-        **The communication coach born from love and struggle.**
-        Founded by Predrag Mirković during his fight to reunite with his daughter Samantha, The Third Voice heals families through better communication. Visit us at [thethirdvoice.ai](https://thethirdvoice.ai) or email [hello@thethirdvoice.ai](mailto:hello@thethirdvoice.ai).
-        **How it works:**
-        1. **Select your context** - Personalized coaching for every relationship
-        2. **Refine your words** - Improve what you send
-        3. **Decode their heart** - Understand the meaning behind their messages
-        4. **Build better patterns** - Journal to strengthen family bonds
-        **Key Features:**
-        - 🎯 Context-aware coaching for real-life relationships
-        - 📘 Personal journal for insights
-        - 💾 Export/import your data
-        - 🔒 Privacy-first design
-        **Privacy First:** All data stays on your device.
-        **Beta v1.0.0** — Built with ❤️ to reunite families.
-        *"When both people are talking from pain, someone needs to be the third voice."*
-        ---
-        **Join the Movement:**
-        - 💻 Contribute on [GitHub](https://github.com/thethirdvoice)
-        - 📧 Suggest features or report bugs
-        - 🌟 Share your family stories
-        **Technical Details:**
-        - Powered by OpenRouter API
-        - Built with Streamlit on an Android phone
-        """)
+        with st.expander("View Chat History", expanded=False):
+            # Displaying last 10 messages for brevity, reversed to show newest at top of history
+            for msg in reversed(history[-10:]):
+                st.markdown(f"""
+                **{msg['time']}** | **{msg['type'].title()}** | Score: {msg['healing_score']}/10
+                """)
 
-render_tabs()
+                with st.container():
+                    st.markdown("**Your Message:**")
+                    st.info(msg['original'])
+
+                with st.container():
+                    st.markdown("**AI Guidance:**")
+                    st.text_area(
+                        "AI Guidance for History Entry",
+                        value=msg['result'],
+                        height=100,
+                        key=f"history_response_{msg['id']}",
+                        disabled=True,
+                        label_visibility="hidden"
+                    )
+                    st.caption(f"🤖 Model: {msg.get('model', 'Unknown')}")
+
+                st.markdown("---")
+    else:
+        st.info("📝 No chat history yet. Start a conversation above!")
+
+# Add contact page
+def render_add_contact():
+    if st.session_state.page != "add_contact":
+        return
+
+    st.markdown("### ➕ Add New Contact")
+
+    if st.button("← Back to Contacts", key="back_to_contacts", use_container_width=True):
+        st.session_state.page = "contacts"
+        st.session_state.last_error_message = None
+        st.session_state.clear_conversation_input = False
+        st.rerun()
+
+    with st.form("add_contact_form"):
+        name = st.text_input("Name", placeholder="Sarah, Mom, Dad...", key="add_contact_name_input")
+        context_options = list(CONTEXTS.keys())
+        context_selected_index = context_options.index(st.session_state.add_contact_context_select) if st.session_state.add_contact_context_select in context_options else 0
+
+        context = st.selectbox("Relationship", context_options,
+                               index=context_selected_index,
+                               format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}",
+                               key="add_contact_context_select")
+
+        if st.form_submit_button("Add Contact"):
+            name_to_add = st.session_state.add_contact_name_input
+            context_to_add = st.session_state.add_contact_context_select
+            if name_to_add.strip():
+                if name_to_add not in st.session_state.contacts:  # Prevent adding duplicate names
+                    if save_contact(name_to_add, context_to_add):
+                        st.session_state.contacts = load_contacts_and_history()  # Reload to get ID
+                        st.success(f"Added {name_to_add}")
+                        st.session_state.page = "contacts"
+                        st.session_state.add_contact_name_input = ""
+                        st.session_state.add_contact_context_select = list(CONTEXTS.keys())[0]
+                        st.session_state.last_error_message = None
+                        st.session_state.clear_conversation_input = False
+                        st.rerun()
+                    else:
+                        st.session_state.last_error_message = "Failed to add contact. Please try again."
+                else:
+                    st.session_state.last_error_message = "Contact with this name already exists."
+                    st.rerun()
+            else:
+                st.session_state.last_error_message = "Contact name cannot be empty."
+                st.rerun()
+
+# Main app
+def main():
+    st.set_page_config(page_title="The Third Voice", layout="wide")
+    initialize_session()
+
+    if not st.session_state.contacts:
+        render_first_time_screen()
+    else:
+        if st.session_state.page == "contacts":
+            render_contact_list()
+        elif st.session_state.page == "edit_contact":
+            render_edit_contact()
+        elif st.session_state.page == "add_contact":
+            render_add_contact()
+        elif st.session_state.page == "conversation":
+            render_conversation()
+
+if __name__ == "__main__":
+    main()
