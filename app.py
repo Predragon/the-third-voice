@@ -5,7 +5,7 @@ st.title("OpenRouter API Test")
 
 # Read API key and model from Streamlit secrets
 api_key = st.secrets["openrouter"]["api_key"]
-model = st.secrets["MODELS"]["model1"]
+model = st.secrets["MODELS"]["model2"]
 api_url = "https://openrouter.ai/api/v1/chat/completions"
 
 # UI input
