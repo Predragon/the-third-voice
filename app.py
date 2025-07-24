@@ -4,7 +4,7 @@ from supabase import create_client, Client
 import os
 import json
 import hashlib
-from datetime import datetime, timezone, timedelta # Import timedelta here
+from datetime import datetime, timezone, timedelta  # Import timedelta here
 
 # --- Constants ---
 CONTEXTS = {
@@ -166,8 +166,8 @@ def load_contacts_and_history():
                     "healing_score": msg.get("healing_score", 0),
                     "model": msg.get("model", "Unknown"),
                     "sentiment": msg.get("sentiment", "unknown"),
-                    "ai_analysis_text": msg.get("ai_analysis_text", "No analysis provided."), # <<< CHANGED
-                    "detected_emotion_label": msg.get("detected_emotion_label", "unknown") # <<< ADDED (if you added the column)
+                    "ai_analysis_text": msg.get("ai_analysis_text", "No analysis provided."),  # <<< CHANGED
+                    "detected_emotion_label": msg.get("detected_emotion_label", "unknown")  # <<< ADDED (if you added the column)
                 })
         
         return contacts_data
@@ -257,11 +257,11 @@ def save_message(contact_id, contact_name, message_type, original, result, ai_an
             "type": message_type,
             "original": original,
             "result": result,
-            "ai_analysis_text": ai_analysis_text, # <<< CHANGED COLUMN NAME
+            "ai_analysis_text": ai_analysis_text,  # <<< CHANGED COLUMN NAME
             "healing_score": healing_score,
             "model": model_used,
             "sentiment": sentiment,
-            "detected_emotion_label": detected_emotion_label, # <<< ADDED (if column exists)
+            "detected_emotion_label": detected_emotion_label,  # <<< ADDED (if column exists)
             "user_id": user_id,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
@@ -311,8 +311,8 @@ def process_message(contact_name, message, context):
     
     ai_response_text = ""
     ai_sentiment = "unknown"
-    ai_analysis_text = "No analysis provided." # <<< CHANGED VARIABLE NAME
-    detected_emotion_label = "unknown" # <<< ADDED VARIABLE
+    ai_analysis_text = "No analysis provided."  # <<< CHANGED VARIABLE NAME
+    detected_emotion_label = "unknown"  # <<< ADDED VARIABLE
     healing_score = 0
     model_used = MODEL
     
@@ -325,8 +325,8 @@ def process_message(contact_name, message, context):
             ai_response_text = cached["response"]
             healing_score = cached["healing_score"]
             ai_sentiment = cached["sentiment"]
-            ai_analysis_text = cached["ai_analysis_text"] # <<< CHANGED
-            detected_emotion_label = cached["detected_emotion_label"] # <<< ADDED
+            ai_analysis_text = cached["ai_analysis_text"]  # <<< CHANGED
+            detected_emotion_label = cached["detected_emotion_label"]  # <<< ADDED
             model_used = cached["model"]
             
             st.info("Using cached response for faster processing")
@@ -370,26 +370,26 @@ def process_message(contact_name, message, context):
                 "Authorization": f"Bearer {openrouter_api_key}",
                 "Content-Type": "application/json",
                 # Add these headers for better tracking and potential rate limit management
-                "HTTP-Referer": "https://thethirdvoiceai.streamlit.app/", # Replace with your deployed Streamlit app URL
+                "HTTP-Referer": "https://thethirdvoiceai.streamlit.app/",  # Replace with your deployed Streamlit app URL
                 "X-Title": "The Third Voice AI"
             }
             payload = {
-                "model": MODEL, # Consider using a more capable model here for better results
+                "model": MODEL,  # Consider using a more capable model here for better results
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": message}
                 ],
                 "temperature": 0.7,
-                "max_tokens": 800, # Increased for detailed JSON and explanations
-                "response_format": {"type": "json_object"} # Crucial for JSON output
+                "max_tokens": 800,  # Increased for detailed JSON and explanations
+                "response_format": {"type": "json_object"}  # Crucial for JSON output
             }
             
             try:
-                response = requests.post(API_URL, headers=headers, json=payload, timeout=45) # Increased timeout
-                response.raise_for_status() # Raise an HTTPError for bad responses (4xx or 5xx)
+                response = requests.post(API_URL, headers=headers, json=payload, timeout=45)  # Increased timeout
+                response.raise_for_status()  # Raise an HTTPError for bad responses (4xx or 5xx)
                 response_json = response.json()
                 
-                loading_placeholder.empty() # Clear loading message
+                loading_placeholder.empty()  # Clear loading message
                 
                 if "choices" in response_json and len(response_json["choices"]) > 0:
                     ai_raw_content = response_json["choices"][0]["message"]["content"]
@@ -398,18 +398,18 @@ def process_message(contact_name, message, context):
                         ai_parsed_response = json.loads(ai_raw_content)
                         ai_response_text = ai_parsed_response.get("suggested_message", "").strip()
                         ai_sentiment = ai_parsed_response.get("detected_sentiment", "unknown").strip().lower()
-                        ai_analysis_text = ai_parsed_response.get("emotional_analysis", "No analysis provided.").strip() # <<< CHANGED
-                        detected_emotion_label = ai_parsed_response.get("detected_emotion_label", "unknown").strip().lower() # <<< ADDED
+                        ai_analysis_text = ai_parsed_response.get("emotional_analysis", "No analysis provided.").strip()  # <<< CHANGED
+                        detected_emotion_label = ai_parsed_response.get("detected_emotion_label", "unknown").strip().lower()  # <<< ADDED
 
                         # Calculate healing score based on AI's rationale or your own logic
-                        healing_score = 5 # Base score
+                        healing_score = 5  # Base score
                         if ai_sentiment in ["positive", "hopeful", "calm"]:
                             healing_score += 2
                         if "empathy" in ai_analysis_text.lower() or "validation" in ai_analysis_text.lower():
                             healing_score += 2
-                        if len(ai_response_text) > 50 and len(ai_response_text) < 250: # Prefer concise but not too short
+                        if len(ai_response_text) > 50 and len(ai_response_text) < 250:  # Prefer concise but not too short
                             healing_score += 1
-                        healing_score = min(10, healing_score) # Cap at 10
+                        healing_score = min(10, healing_score)  # Cap at 10
                         
                         # Cache the response with all details
                         cache_data = {
@@ -420,10 +420,10 @@ def process_message(contact_name, message, context):
                             "healing_score": healing_score,
                             "model": MODEL,
                             "sentiment": ai_sentiment,
-                            "ai_analysis_text": ai_analysis_text, # <<< CHANGED
-                            "detected_emotion_label": detected_emotion_label, # <<< ADDED
+                            "ai_analysis_text": ai_analysis_text,  # <<< CHANGED
+                            "detected_emotion_label": detected_emotion_label,  # <<< ADDED
                             "user_id": user_id,
-                            "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat() # Cache for 7 days
+                            "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()  # Cache for 7 days
                         }
                         supabase.table("ai_response_cache").insert(cache_data).execute()
                         
@@ -431,7 +431,7 @@ def process_message(contact_name, message, context):
                         st.session_state.last_error_message = f"AI returned invalid JSON. Raw response: {ai_raw_content[:500]}..."
                         return
                     except Exception as cache_error:
-                        st.warning(f"Could not cache AI response: {cache_error}") # Don't stop app for cache error
+                        st.warning(f"Could not cache AI response: {cache_error}")  # Don't stop app for cache error
                         
                 else:
                     st.session_state.last_error_message = f"AI API response missing 'choices' or content: {response_json}"
@@ -458,17 +458,17 @@ def process_message(contact_name, message, context):
         save_message(contact_id, contact_name, "incoming", message, None, "No analysis for original message.", 0, "N/A", "unknown", "unknown")
         
         # Save the AI response (transformed/coached message + analysis)
-        save_message(contact_id, contact_name, mode, message, ai_response_text, ai_analysis_text, healing_score, model_used, ai_sentiment, detected_emotion_label) # <<< CHANGED
+        save_message(contact_id, contact_name, mode, message, ai_response_text, ai_analysis_text, healing_score, model_used, ai_sentiment, detected_emotion_label)  # <<< CHANGED
         
         # Store response for immediate display
         st.session_state[f"last_response_{contact_name}"] = {
             "response": ai_response_text,
-            "ai_analysis_text": ai_analysis_text, # <<< CHANGED
+            "ai_analysis_text": ai_analysis_text,  # <<< CHANGED
             "healing_score": healing_score,
             "timestamp": datetime.now().timestamp(),
             "model": model_used,
             "sentiment": ai_sentiment,
-            "detected_emotion_label": detected_emotion_label # <<< ADDED
+            "detected_emotion_label": detected_emotion_label  # <<< ADDED
         }
         
         st.session_state.clear_conversation_input = True
@@ -570,51 +570,34 @@ def render_contacts_list_view():
         return
 
     # Sort contacts by most recent activity
-    # Helper function for safer datetime parsing
     def safe_parse_datetime(date_str):
         """Safely parse datetime strings from Supabase"""
         if not isinstance(date_str, str):
-             return date_str if hasattr(date_str, 'year') else datetime.now()
-    
-    try:
-        # Handle 'Z' suffix (UTC)
-        if date_str.endswith('Z'):
-            return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-        # Try parsing as-is (works for Supabase format: 2025-07-23 20:07:11.846812+00)
-        return datetime.fromisoformat(date_str)
-    except ValueError:
-        # Fallback to current time if parsing fails
-        return datetime.now()
+            return date_str if hasattr(date_str, 'year') else datetime.now()
         
-# Sort contacts by most recent activity
-# Helper function for safer datetime parsing
-def safe_parse_datetime(date_str):
-    """Safely parse datetime strings from Supabase"""
-    if not isinstance(date_str, str):
-        return date_str if hasattr(date_str, 'year') else datetime.now()
+        try:
+            # Handle 'Z' suffix (UTC)
+            if date_str.endswith('Z'):
+                return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            # Try parsing as-is (works for Supabase format: 2025-07-23 20:07:11.846812+00)
+            return datetime.fromisoformat(date_str)
+        except ValueError:
+            # Fallback to current time if parsing fails
+            return datetime.now()
+        
+    # Sort contacts by most recent activity
+    sorted_contacts = sorted(
+        st.session_state.contacts.items(),
+        # Key for sorting: find the latest message time, else use contact creation time
+        key=lambda x: (
+            safe_parse_datetime(x[1]["history"][-1]["time"])
+            if x[1]["history"] and len(x[1]["history"]) > 0
+            else safe_parse_datetime(x[1]["created_at"])
+        ),
+        reverse=True
+    )
     
-    try:
-        # Handle 'Z' suffix (UTC)
-        if date_str.endswith('Z'):
-            return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-        # Try parsing as-is (works for Supabase format: 2025-07-23 20:07:11.846812+00)
-        return datetime.fromisoformat(date_str)
-    except ValueError:
-        # Fallback to current time if parsing fails
-        return datetime.now()
-
-# Sort contacts by most recent activity
-sorted_contacts = sorted(
-    st.session_state.contacts.items(),
-    # Key for sorting: find the latest message time, else use contact creation time
-    key=lambda x: (
-        safe_parse_datetime(x[1]["history"][-1]["time"])
-        if x[1]["history"] and len(x[1]["history"]) > 0
-        else safe_parse_datetime(x[1]["created_at"])
-    ),
-    reverse=True
-)
-for name, data in sorted_contacts:
+    for name, data in sorted_contacts:
         last_msg = data["history"][-1] if data["history"] else None
         preview_text = "Start chatting!"
         time_str = "New"
@@ -654,7 +637,7 @@ def render_add_contact_view():
     with st.form("add_contact_form"):
         name = st.text_input("Name", placeholder="Sarah, Mom, Dad...", key="add_contact_name_input_widget")
         context = st.selectbox(
-            "Relationship", 
+            "Relationship",
             list(CONTEXTS.keys()),
             format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}",
             key="add_contact_context_select_widget"
@@ -690,7 +673,7 @@ def render_edit_contact_view():
         context_options = list(CONTEXTS.keys())
         initial_context_index = context_options.index(contact["context"]) if contact["context"] in context_options else 0
         context = st.selectbox(
-            "Relationship", 
+            "Relationship",
             context_options,
             index=initial_context_index,
             format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}",
@@ -808,7 +791,7 @@ def render_conversation_view():
                 st.text_area(
                     "AI Guidance Output",
                     value=last_resp['response'],
-                    height=100, # Made slightly shorter
+                    height=100,  # Made slightly shorter
                     key="ai_response_display",
                     help="Click inside and Ctrl+A to select all, then Ctrl+C to copy",
                     disabled=False,
@@ -817,9 +800,9 @@ def render_conversation_view():
                 
                 st.markdown("---")
                 st.markdown("**Emotional Insights:**")
-                st.info(last_resp.get("ai_analysis_text", "No detailed analysis available.")) # <<< CHANGED
+                st.info(last_resp.get("ai_analysis_text", "No detailed analysis available."))  # <<< CHANGED
                 
-                score_col, model_col, sentiment_col, emotion_col = st.columns(4) # More columns for details
+                score_col, model_col, sentiment_col, emotion_col = st.columns(4)  # More columns for details
                 
                 with score_col:
                     if last_resp["healing_score"] >= 8:
@@ -834,7 +817,7 @@ def render_conversation_view():
                     st.caption(f"📊 Sentiment: **{last_resp.get('sentiment', 'unknown').title()}**")
                 
                 with emotion_col:
-                    st.caption(f"❤️ Emotion: **{last_resp.get('detected_emotion_label', 'unknown').title()}**") # <<< ADDED
+                    st.caption(f"❤️ Emotion: **{last_resp.get('detected_emotion_label', 'unknown').title()}**")  # <<< ADDED
                 
                 if last_resp["healing_score"] >= 8:
                     st.balloons()
@@ -881,7 +864,7 @@ def render_conversation_view():
                             label_visibility="hidden"
                         )
                         st.markdown("**Emotional Insight:**")
-                        st.caption(msg.get('ai_analysis_text', 'No detailed analysis.')) # <<< CHANGED
+                        st.caption(msg.get('ai_analysis_text', 'No detailed analysis.'))  # <<< CHANGED
                         
                         hist_model_col, hist_sentiment_col, hist_emotion_col = st.columns(3)
                         with hist_model_col:
@@ -889,7 +872,7 @@ def render_conversation_view():
                         with hist_sentiment_col:
                             st.caption(f"📊 Sentiment: {msg.get('sentiment', 'unknown').title()}")
                         with hist_emotion_col:
-                            st.caption(f"❤️ Emotion: {msg.get('detected_emotion_label', 'unknown').title()}") # <<< ADDED
+                            st.caption(f"❤️ Emotion: {msg.get('detected_emotion_label', 'unknown').title()}")  # <<< ADDED
 
                 st.markdown("---")
     else:
@@ -925,7 +908,7 @@ def main():
     
     # Sidebar
     with st.sidebar:
-        st.image("https://placehold.co/150x50/ADD8E6/000?text=The+Third+Voice+AI", use_container_width=True) # Replace with your actual logo
+        st.image("https://placehold.co/150x50/ADD8E6/000?text=The+Third+Voice+AI", use_container_width=True)  # Replace with your actual logo
         st.title("The Third Voice AI")
         
         if st.session_state.authenticated:
@@ -993,4 +976,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
