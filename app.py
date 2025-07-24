@@ -568,15 +568,53 @@ def render_contacts_list_view():
             st.session_state.app_mode = "add_contact_view"
             st.rerun()
         return
-    
+
     # Sort contacts by most recent activity
-    sorted_contacts = sorted(
-        st.session_state.contacts.items(),
-        # Key for sorting: find the latest message time, else use contact creation time
-        key=lambda x: datetime.fromisoformat(x[1]["history"][-1]["time"].replace('Z', '+00:00') if isinstance(x[1]["history"][-1]["time"], str) else x[1]["history"][-1]["time"]) if x[1]["history"] else datetime.fromisoformat(x[1]["created_at"].replace('Z', '+00:00')),
-        reverse=True
-    )
+    # Helper function for safer datetime parsing
+    def safe_parse_datetime(date_str):
+        """Safely parse datetime strings from Supabase"""
+        if not isinstance(date_str, str):
+             return date_str if hasattr(date_str, 'year') else datetime.now()
     
+    try:
+        # Handle 'Z' suffix (UTC)
+        if date_str.endswith('Z'):
+            return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        # Try parsing as-is (works for Supabase format: 2025-07-23 20:07:11.846812+00)
+        return datetime.fromisoformat(date_str)
+    except ValueError:
+        # Fallback to current time if parsing fails
+        return datetime.now()
+        
+# Sort contacts by most recent activity
+# Helper function for safer datetime parsing
+def safe_parse_datetime(date_str):
+    """Safely parse datetime strings from Supabase"""
+    if not isinstance(date_str, str):
+        return date_str if hasattr(date_str, 'year') else datetime.now()
+    
+    try:
+        # Handle 'Z' suffix (UTC)
+        if date_str.endswith('Z'):
+            return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        # Try parsing as-is (works for Supabase format: 2025-07-23 20:07:11.846812+00)
+        return datetime.fromisoformat(date_str)
+    except ValueError:
+        # Fallback to current time if parsing fails
+        return datetime.now()
+
+# Sort contacts by most recent activity
+sorted_contacts = sorted(
+    st.session_state.contacts.items(),
+    # Key for sorting: find the latest message time, else use contact creation time
+    key=lambda x: (
+        safe_parse_datetime(x[1]["history"][-1]["time"])
+        if x[1]["history"] and len(x[1]["history"]) > 0
+        else safe_parse_datetime(x[1]["created_at"])
+    ),
+    reverse=True
+)
+
     for name, data in sorted_contacts:
         last_msg = data["history"][-1] if data["history"] else None
         preview_text = "Start chatting!"
