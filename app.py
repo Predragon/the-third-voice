@@ -590,8 +590,8 @@ def render_contacts_list_view():
     if not st.session_state.contacts:
         st.info("No contacts yet. Add your first contact to get started!")
         if st.button("➕ Add New Contact", use_container_width=True):
-        st.session_state.app_mode = "add_contact_view"
-        st.rerun()
+            st.session_state.app_mode = "add_contact_view"
+            st.rerun()
 
 def render_add_contact_view():
     st.markdown("### ➕ Add New Contact")
