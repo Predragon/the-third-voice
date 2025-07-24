@@ -112,7 +112,9 @@ def sign_in(email, password):
 def sign_out():
     try:
         response = supabase.auth.sign_out()
-        if not response.error:
+        
+        # Handle the case where response might be None or not have an error attribute
+        if response is None or not hasattr(response, 'error') or not response.error:
             # Clear all session state
             for key in list(st.session_state.keys()):
                 if key not in ['authenticated', 'user', 'app_mode']:
@@ -127,7 +129,17 @@ def sign_out():
         else:
             st.error(f"Logout failed: {response.error.message}")
     except Exception as e:
-        st.error(f"An unexpected error occurred during logout: {e}")
+        # Fallback: Clear session state even if logout API fails
+        for key in list(st.session_state.keys()):
+            if key not in ['authenticated', 'user', 'app_mode']:
+                del st.session_state[key]
+        
+        st.session_state.authenticated = False
+        st.session_state.user = None
+        st.session_state.app_mode = "login"
+        
+        st.warning(f"Logout may have failed ({e}), but session cleared locally.")
+        st.rerun()
 
 # --- Data Loading Functions ---
 @st.cache_data(ttl=30)  # Shorter cache time for more responsive updates
@@ -578,66 +590,6 @@ def render_contacts_list_view():
     if not st.session_state.contacts:
         st.info("No contacts yet. Add your first contact to get started!")
         if st.button("➕ Add New Contact", use_container_width=True):
-            st.session_state.app_mode = "add_contact_view"
-            st.rerun()
-        return
-
-    # Debug and cache clear
-    if st.checkbox("Debug: Show Contacts Data"):
-        st.write("Supabase Contacts Data at", datetime.now(timezone.utc).isoformat(), ":", st.session_state.contacts)
-    if st.button("Clear Cache and Reload at " + datetime.now(timezone.utc).isoformat()):
-        st.cache_data.clear()
-        st.session_state.contacts = load_contacts_and_history()
-        st.rerun()
-
-    # FIXED SORTING LOGIC - Simple and reliable
-    def get_last_activity_time(contact_data):
-        """Get the last activity time for sorting contacts"""
-        # If contact has message history, try to use the most recent message time
-        if contact_data.get("history") and len(contact_data["history"]) > 0:
-            # Since messages are loaded chronologically, the last one is most recent
-            # But we'll use contact's created_at as a fallback since message times are formatted strings
-            return contact_data.get("created_at", "")
-        # If no history, use contact creation time
-        return contact_data.get("created_at", "")
-
-    # Sort contacts by last activity (most recent first)
-    try:
-        sorted_contacts = sorted(
-            st.session_state.contacts.items(),
-            key=lambda x: get_last_activity_time(x[1]),
-            reverse=True
-        )
-    except Exception as e:
-        st.error(f"Error sorting contacts: {e}")
-        # Fallback to unsorted list
-        sorted_contacts = list(st.session_state.contacts.items())
-    
-    for name, data in sorted_contacts:
-        last_msg = data.get("history", [])[-1] if data.get("history") else None
-        preview_text = "Start chatting!"
-        time_str = "New"
-
-        if last_msg:
-            original_text = last_msg.get('original', '')
-            if original_text:
-                preview_text = f"{original_text[:40]}{'...' if len(original_text) > 40 else ''}"
-            time_str = last_msg.get("time", "Unknown")
-        
-        if st.button(
-            f"**{name}** | {time_str}\n_{preview_text}_",
-            key=f"contact_{name}",
-            use_container_width=True
-        ):
-            st.session_state.active_contact = name
-            st.session_state.app_mode = "conversation_view"
-            st.session_state.conversation_input_text = ""
-            st.session_state.clear_conversation_input = False
-            st.session_state.last_error_message = None
-            st.rerun()
-    
-    st.markdown("---")
-    if st.button("➕ Add New Contact", use_container_width=True):
         st.session_state.app_mode = "add_contact_view"
         st.rerun()
 
@@ -991,3 +943,63 @@ def main():
 
 if __name__ == "__main__":
     main()
+            st.session_state.app_mode = "add_contact_view"
+            st.rerun()
+        return
+
+    # Debug and cache clear
+    if st.checkbox("Debug: Show Contacts Data"):
+        st.write("Supabase Contacts Data at", datetime.now(timezone.utc).isoformat(), ":", st.session_state.contacts)
+    if st.button("Clear Cache and Reload at " + datetime.now(timezone.utc).isoformat()):
+        st.cache_data.clear()
+        st.session_state.contacts = load_contacts_and_history()
+        st.rerun()
+
+    # FIXED SORTING LOGIC - Simple and reliable
+    def get_last_activity_time(contact_data):
+        """Get the last activity time for sorting contacts"""
+        # If contact has message history, try to use the most recent message time
+        if contact_data.get("history") and len(contact_data["history"]) > 0:
+            # Since messages are loaded chronologically, the last one is most recent
+            # But we'll use contact's created_at as a fallback since message times are formatted strings
+            return contact_data.get("created_at", "")
+        # If no history, use contact creation time
+        return contact_data.get("created_at", "")
+
+    # Sort contacts by last activity (most recent first)
+    try:
+        sorted_contacts = sorted(
+            st.session_state.contacts.items(),
+            key=lambda x: get_last_activity_time(x[1]),
+            reverse=True
+        )
+    except Exception as e:
+        st.error(f"Error sorting contacts: {e}")
+        # Fallback to unsorted list
+        sorted_contacts = list(st.session_state.contacts.items())
+    
+    for name, data in sorted_contacts:
+        last_msg = data.get("history", [])[-1] if data.get("history") else None
+        preview_text = "Start chatting!"
+        time_str = "New"
+
+        if last_msg:
+            original_text = last_msg.get('original', '')
+            if original_text:
+                preview_text = f"{original_text[:40]}{'...' if len(original_text) > 40 else ''}"
+            time_str = last_msg.get("time", "Unknown")
+        
+        if st.button(
+            f"**{name}** | {time_str}\n_{preview_text}_",
+            key=f"contact_{name}",
+            use_container_width=True
+        ):
+            st.session_state.active_contact = name
+            st.session_state.app_mode = "conversation_view"
+            st.session_state.conversation_input_text = ""
+            st.session_state.clear_conversation_input = False
+            st.session_state.last_error_message = None
+            st.rerun()
+    
+    st.markdown("---")
+    if st.button("➕ Add New Contact", use_container_width=True):
