@@ -614,8 +614,7 @@ sorted_contacts = sorted(
     ),
     reverse=True
 )
-
-    for name, data in sorted_contacts:
+for name, data in sorted_contacts:
         last_msg = data["history"][-1] if data["history"] else None
         preview_text = "Start chatting!"
         time_str = "New"
