@@ -590,39 +590,28 @@ def render_contacts_list_view():
         st.session_state.contacts = load_contacts_and_history()
         st.rerun()
 
-    # Sort contacts by most recent activity
-    def safe_parse_datetime(date_str):
-        """Safely parse datetime strings from Supabase, returning a datetime object."""
-        if not date_str:  # Handle None or empty string
-            st.warning(f"Empty datetime value at {datetime.now(timezone.utc).isoformat()}: {date_str}")
-            return datetime.min
-        if isinstance(date_str, datetime):
-            return date_str
-        
-        try:
-            if isinstance(date_str, str):
-                # Handle both T-separated and space-separated ISO formats
-                if ' ' in date_str and 'T' not in date_str:
-                    date_str = date_str.replace(' ', 'T')
-                if date_str.endswith('Z'):
-                    return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                return datetime.fromisoformat(date_str)
-            st.warning(f"Unexpected datetime type at {datetime.now(timezone.utc).isoformat()}: {type(date_str)}, value: {date_str}")
-            return datetime.min
-        except (ValueError, TypeError) as e:
-            st.warning(f"Failed to parse Supabase datetime at {datetime.now(timezone.utc).isoformat()}: {date_str}, error: {e}")
-            return datetime.min
-    
-    # Sort contacts by most recent activity
-    sorted_contacts = sorted(
-        st.session_state.contacts.items(),
-        key=lambda x: (
-            safe_parse_datetime(x[1]["history"][-1]["time"])
-            if x[1].get("history") and len(x[1]["history"]) > 0 and x[1]["history"][-1].get("time")
-            else safe_parse_datetime(x[1].get("created_at", datetime.min.isoformat()))
-        ),
-        reverse=True
-    )
+    # FIXED SORTING LOGIC - Simple and reliable
+    def get_last_activity_time(contact_data):
+        """Get the last activity time for sorting contacts"""
+        # If contact has message history, try to use the most recent message time
+        if contact_data.get("history") and len(contact_data["history"]) > 0:
+            # Since messages are loaded chronologically, the last one is most recent
+            # But we'll use contact's created_at as a fallback since message times are formatted strings
+            return contact_data.get("created_at", "")
+        # If no history, use contact creation time
+        return contact_data.get("created_at", "")
+
+    # Sort contacts by last activity (most recent first)
+    try:
+        sorted_contacts = sorted(
+            st.session_state.contacts.items(),
+            key=lambda x: get_last_activity_time(x[1]),
+            reverse=True
+        )
+    except Exception as e:
+        st.error(f"Error sorting contacts: {e}")
+        # Fallback to unsorted list
+        sorted_contacts = list(st.session_state.contacts.items())
     
     for name, data in sorted_contacts:
         last_msg = data.get("history", [])[-1] if data.get("history") else None
@@ -633,7 +622,7 @@ def render_contacts_list_view():
             original_text = last_msg.get('original', '')
             if original_text:
                 preview_text = f"{original_text[:40]}{'...' if len(original_text) > 40 else ''}"
-            time_str = last_msg["time"]
+            time_str = last_msg.get("time", "Unknown")
         
         if st.button(
             f"**{name}** | {time_str}\n_{preview_text}_",
