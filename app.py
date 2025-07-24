@@ -306,6 +306,9 @@ def save_message(contact_id, contact_name, message_type, original, result, ai_an
 
 # --- AI Message Processing ---
 # MODIFIED process_message for enhanced prompt, JSON parsing, and column names
+
+# Replace your existing process_message function with this updated version
+
 def process_message(contact_name, message, context):
     st.session_state.last_error_message = None
     
@@ -326,6 +329,17 @@ def process_message(contact_name, message, context):
         st.session_state.last_error_message = "OpenRouter API Key not found in Streamlit secrets under [openrouter]. Please add it."
         return
     
+    # Get models from secrets with fallback to default
+    try:
+        models = [
+            st.secrets["MODELS"]["model1"],
+            st.secrets["MODELS"]["model2"], 
+            st.secrets["MODELS"]["model3"]
+        ]
+    except KeyError as e:
+        st.warning(f"Model configuration not found in secrets: {e}. Using default model.")
+        models = ["google/gemma-2-9b-it:free"]  # Fallback to your current model
+    
     # Determine message type
     is_incoming = any(indicator in message.lower() for indicator in ["said:", "wrote:", "texted:", "told me:"])
     mode = "translate" if is_incoming else "coach"
@@ -339,7 +353,7 @@ def process_message(contact_name, message, context):
     ai_analysis_text = "No analysis provided."
     detected_emotion_label = "unknown"
     healing_score = 0
-    model_used = MODEL
+    model_used = "Unknown"
     
     try:
         cache_response = supabase.table("ai_response_cache").select("*").eq("contact_id", contact_id).eq("message_hash", message_hash).eq("user_id", user_id).gte("expires_at", datetime.now(timezone.utc).isoformat()).execute()
@@ -356,7 +370,7 @@ def process_message(contact_name, message, context):
             
             st.info("Using cached response for faster processing")
         else:
-            # Generate new response
+            # Generate new response with model fallback
             system_prompt = (
                 f"You are an emotionally intelligent relationship guide for a {context} relationship with {contact_name}. "
                 f"Your goal is to help users navigate challenging conversations by providing empathetic, constructive, and healing communication strategies. "
@@ -394,92 +408,105 @@ def process_message(contact_name, message, context):
             headers = {
                 "Authorization": f"Bearer {openrouter_api_key}",
                 "Content-Type": "application/json",
-                # Add these headers for better tracking and potential rate limit management
-                "HTTP-Referer": "https://thethirdvoiceai.streamlit.app/",  # Replace with your deployed Streamlit app URL
+                "HTTP-Referer": "https://thethirdvoiceai.streamlit.app/",
                 "X-Title": "The Third Voice AI"
             }
-            payload = {
-                "model": MODEL,  # Consider using a more capable model here for better results
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": message}
-                ],
-                "temperature": 0.7,
-                "max_tokens": 800,  # Increased for detailed JSON and explanations
-                "response_format": {"type": "json_object"}  # Crucial for JSON output
-            }
             
-            try:
-                response = requests.post(API_URL, headers=headers, json=payload, timeout=45)  # Increased timeout
-                response.raise_for_status()  # Raise an HTTPError for bad responses (4xx or 5xx)
-                response_json = response.json()
-                
-                loading_placeholder.empty()  # Clear loading message
-                
-                if "choices" in response_json and len(response_json["choices"]) > 0:
-                    ai_raw_content = response_json["choices"][0]["message"]["content"]
+            # Try each model in sequence
+            successful_model = None
+            for i, model in enumerate(models, 1):
+                try:
+                    loading_placeholder.markdown(f"🤖 Trying AI Model {i}/{len(models)}: {model.split('/')[-1]}...")
                     
-                    try:
-                        ai_parsed_response = json.loads(ai_raw_content)
-                        ai_response_text = ai_parsed_response.get("suggested_message", "").strip()
-                        ai_sentiment = ai_parsed_response.get("detected_sentiment", "unknown").strip().lower()
-                        ai_analysis_text = ai_parsed_response.get("emotional_analysis", "No analysis provided.").strip()
-                        detected_emotion_label = ai_parsed_response.get("detected_emotion_label", "unknown").strip().lower()
-
-                        # Calculate healing score based on AI's rationale or your own logic
-                        healing_score = 5  # Base score
-                        if ai_sentiment in ["positive", "hopeful", "calm"]:
-                            healing_score += 2
-                        if "empathy" in ai_analysis_text.lower() or "validation" in ai_analysis_text.lower():
-                            healing_score += 2
-                        if len(ai_response_text) > 50 and len(ai_response_text) < 250:  # Prefer concise but not too short
-                            healing_score += 1
-                        healing_score = min(10, healing_score)  # Cap at 10
+                    payload = {
+                        "model": model,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": message}
+                        ],
+                        "temperature": 0.7,
+                        "max_tokens": 800,
+                        "response_format": {"type": "json_object"}
+                    }
+                    
+                    response = requests.post(API_URL, headers=headers, json=payload, timeout=45)
+                    
+                    if response.status_code == 200:
+                        response_json = response.json()
                         
-                        # Cache the response with all details
-                        cache_data = {
-                            "contact_id": contact_id,
-                            "message_hash": message_hash,
-                            "context": context,
-                            "response": ai_response_text,
-                            "healing_score": healing_score,
-                            "model": MODEL,
-                            "sentiment": ai_sentiment,
-                            "ai_analysis_text": ai_analysis_text,
-                            "detected_emotion_label": detected_emotion_label,
-                            "user_id": user_id,
-                            "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()  # Cache for 7 days
-                        }
-                        supabase.table("ai_response_cache").insert(cache_data).execute()
+                        if "choices" in response_json and len(response_json["choices"]) > 0:
+                            ai_raw_content = response_json["choices"][0]["message"]["content"]
+                            
+                            try:
+                                ai_parsed_response = json.loads(ai_raw_content)
+                                ai_response_text = ai_parsed_response.get("suggested_message", "").strip()
+                                ai_sentiment = ai_parsed_response.get("detected_sentiment", "unknown").strip().lower()
+                                ai_analysis_text = ai_parsed_response.get("emotional_analysis", "No analysis provided.").strip()
+                                detected_emotion_label = ai_parsed_response.get("detected_emotion_label", "unknown").strip().lower()
+                                
+                                # Calculate healing score
+                                healing_score = 5  # Base score
+                                if ai_sentiment in ["positive", "hopeful", "calm"]:
+                                    healing_score += 2
+                                if "empathy" in ai_analysis_text.lower() or "validation" in ai_analysis_text.lower():
+                                    healing_score += 2
+                                if len(ai_response_text) > 50 and len(ai_response_text) < 250:
+                                    healing_score += 1
+                                healing_score = min(10, healing_score)
+                                
+                                model_used = model
+                                successful_model = model
+                                
+                                st.success(f"✅ Model {i} ({model.split('/')[-1]}) succeeded!")
+                                break  # Success! Exit the loop
+                                
+                            except json.JSONDecodeError:
+                                st.warning(f"⚠️ Model {i} ({model.split('/')[-1]}) returned invalid JSON. Trying next model...")
+                                continue
+                        else:
+                            st.warning(f"⚠️ Model {i} ({model.split('/')[-1]}) returned no content. Trying next model...")
+                            continue
+                    else:
+                        st.warning(f"⚠️ Model {i} ({model.split('/')[-1]}) failed with status {response.status_code}. Trying next model...")
+                        continue
                         
-                    except json.JSONDecodeError:
-                        st.session_state.last_error_message = f"AI returned invalid JSON. Raw response: {ai_raw_content[:500]}..."
-                        return
-                    except Exception as cache_error:
-                        st.warning(f"Could not cache AI response: {cache_error}")  # Don't stop app for cache error
-                        
-                else:
-                    st.session_state.last_error_message = f"AI API response missing 'choices' or content: {response_json}"
-                    return
+                except requests.exceptions.Timeout:
+                    st.warning(f"⚠️ Model {i} ({model.split('/')[-1]}) timed out. Trying next model...")
+                    continue
+                except requests.exceptions.ConnectionError:
+                    st.warning(f"⚠️ Model {i} ({model.split('/')[-1]}) connection error. Trying next model...")
+                    continue
+                except Exception as e:
+                    st.warning(f"⚠️ Model {i} ({model.split('/')[-1]}) error: {str(e)}. Trying next model...")
+                    continue
             
-            except requests.exceptions.Timeout:
-                loading_placeholder.empty()
-                st.session_state.last_error_message = "API request timed out. Please try again."
+            loading_placeholder.empty()  # Clear loading message
+            
+            # Check if any model succeeded
+            if not successful_model:
+                st.session_state.last_error_message = "❌ All AI models failed. Please try again later."
                 return
-            except requests.exceptions.ConnectionError:
-                loading_placeholder.empty()
-                st.session_state.last_error_message = "Connection error. Please check your internet connection."
-                return
-            except requests.exceptions.HTTPError as e:
-                loading_placeholder.empty()
-                st.session_state.last_error_message = f"AI API error: {e.response.status_code} - {e.response.text}"
-                return
-            except Exception as e:
-                loading_placeholder.empty()
-                st.session_state.last_error_message = f"An unexpected error occurred during AI processing: {e}"
-                return
+            
+            # Cache the successful response
+            try:
+                cache_data = {
+                    "contact_id": contact_id,
+                    "message_hash": message_hash,
+                    "context": context,
+                    "response": ai_response_text,
+                    "healing_score": healing_score,
+                    "model": model_used,
+                    "sentiment": ai_sentiment,
+                    "ai_analysis_text": ai_analysis_text,
+                    "detected_emotion_label": detected_emotion_label,
+                    "user_id": user_id,
+                    "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+                }
+                supabase.table("ai_response_cache").insert(cache_data).execute()
+            except Exception as cache_error:
+                st.warning(f"Could not cache AI response: {cache_error}")
         
-        # Save the incoming message (original) - we're not running AI analysis on this, so default values
+        # Save the incoming message (original)
         save_message(contact_id, contact_name, "incoming", message, None, "No analysis for original message.", 0, "N/A", "unknown", "unknown")
         
         # Save the AI response (transformed/coached message + analysis)
@@ -1003,6 +1030,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-##############
