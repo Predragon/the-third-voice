@@ -50,7 +50,9 @@ def init_session_state():
         'edit_contact_name_input': "",
         'add_contact_name_input': "",
         'add_contact_context_select': list(CONTEXTS.keys())[0],
-        'last_error_message': None
+        'last_error_message': None,
+        'show_verification_notice': False,
+        'verification_email': None
     }
     
     for key, value in defaults.items():
@@ -75,13 +77,69 @@ def create_message_hash(message, context):
     """Create a hash for message caching"""
     return hashlib.md5(f"{message.strip().lower()}{context}".encode()).hexdigest()
 
+# --- Feedback System Functions ---
+def save_feedback(rating, feedback_text, feature_context="general"):
+    """Save user feedback to database"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return False
+    
+    try:
+        feedback_data = {
+            "user_id": user_id,
+            "rating": rating,
+            "feedback_text": feedback_text.strip() if feedback_text else None,
+            "feature_context": feature_context,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        response = supabase.table("feedback").insert(feedback_data).execute()
+        return bool(response.data)
+        
+    except Exception as e:
+        st.error(f"Error saving feedback: {e}")
+        return False
+
+def show_feedback_widget(context="general"):
+    """Display feedback widget"""
+    with st.expander("💬 Help us improve The Third Voice", expanded=False):
+        st.markdown("*Your feedback helps us build better family healing tools*")
+        
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            rating = st.selectbox(
+                "How helpful was this?",
+                options=[5, 4, 3, 2, 1],
+                format_func=lambda x: f"{'⭐' * x} ({x}/5)",
+                key=f"feedback_rating_{context}"
+            )
+        
+        with col2:
+            feedback_text = st.text_area(
+                "What can we improve?",
+                placeholder="Share your thoughts, suggestions, or issues...",
+                height=80,
+                key=f"feedback_text_{context}"
+            )
+        
+        if st.button("Send Feedback", key=f"send_feedback_{context}"):
+            if save_feedback(rating, feedback_text, context):
+                st.success("Thank you! Your feedback helps us heal more families. 💙")
+                # Clear the form
+                st.session_state[f"feedback_text_{context}"] = ""
+            else:
+                st.error("Could not save feedback. Please try again.")
+
 # --- Authentication Functions ---
 def sign_up(email, password):
     try:
         response = supabase.auth.sign_up({"email": email, "password": password})
         if response.user:
-            st.success("Sign-up successful! Please check your email to confirm your account.")
-            st.session_state.app_mode = "login"
+            # Set verification notice
+            st.session_state.show_verification_notice = True
+            st.session_state.verification_email = email
+            st.session_state.app_mode = "verification_notice"
             st.rerun()
         elif response.error:
             st.error(f"Sign-up failed: {response.error.message}")
@@ -398,45 +456,146 @@ def process_message(contact_name, message, context):
         st.session_state.last_error_message = f"An unexpected error occurred: {e}"
 
 # --- UI Pages ---
+def verification_notice_page():
+    """Complete email verification notice page"""
+    st.title("🎙️ Welcome to The Third Voice AI")
+    
+    st.success("✅ Account created successfully!")
+    
+    st.markdown("### 📧 Check Your Email")
+    st.info(f"""
+    **Verification email sent to:** `{st.session_state.verification_email}`
+    
+    **Next steps:**
+    1. Check your email inbox (and spam folder)
+    2. Click the verification link in the email
+    3. Return here and log in
+    
+    **⏰ The verification email may take a few minutes to arrive.**
+    """)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("📨 Resend Verification Email", use_container_width=True):
+            try:
+                # Attempt to resend verification
+                supabase.auth.resend({"type": "signup", "email": st.session_state.verification_email})
+                st.success("Verification email resent!")
+            except Exception as e:
+                st.warning("Could not resend email. Please try signing up again if needed.")
+    
+    with col2:
+        if st.button("🔑 Go to Login", use_container_width=True):
+            st.session_state.app_mode = "login"
+            st.session_state.show_verification_notice = False
+            st.rerun()
+    
+    st.markdown("---")
+    st.markdown("### 💙 Welcome to The Family Healing Revolution")
+    st.markdown("""
+    **The Third Voice AI** helps families communicate with love, understanding, and healing. 
+    You're about to join thousands of people rebuilding their most important relationships.
+    
+    *"When both people are speaking from pain, someone must be the third voice."*
+    """)
+    
+    # Add helpful tips while they wait
+    with st.expander("💡 What to expect after verification", expanded=True):
+        st.markdown("""
+        **Once you're verified and logged in, you'll be able to:**
+        
+        - ✨ Transform difficult conversations into healing moments
+        - 💕 Get guidance for romantic, family, work, and friendship relationships  
+        - 🎯 Receive personalized coaching based on your relationship context
+        - 📊 Track your healing progress with our scoring system
+        - 💬 Access your conversation history across all your contacts
+        
+        **Built by a father separated from his daughter, for every family seeking healing.**
+        """)
+
 def login_page():
-    st.title("Welcome to The Third Voice AI")
+    st.title("🎙️ The Third Voice AI")
     st.subheader("Login to continue your healing journey.")
+    
+    # Mission statement at top
+    st.markdown("""
+    > *"When both people are speaking from pain, someone must be the third voice."*
+    
+    **We are that voice** — calm, wise, and healing.
+    """)
     
     with st.form("login_form"):
         email = st.text_input("Email", key="login_email")
         password = st.text_input("Password", type="password", key="login_password")
-        login_button = st.form_submit_button("Login")
+        login_button = st.form_submit_button("Login", use_container_width=True)
         
         if login_button:
             sign_in(email, password)
     
     st.markdown("---")
     st.subheader("New User?")
-    if st.button("Create an Account"):
+    if st.button("Create an Account", use_container_width=True):
         st.session_state.app_mode = "signup"
         st.rerun()
+    
+    # Show mission context
+    with st.expander("💙 Our Mission", expanded=False):
+        st.markdown("""
+        **The Third Voice AI** was born from communication breakdowns that shattered a family. 
+        We're turning pain into purpose, helping families heal through better conversations.
+        
+        Built with love by Predrag Mirkovic, fighting to return to his 6-year-old daughter Samantha 
+        after 15 months apart. Every feature serves family healing.
+        """)
 
 def signup_page():
-    st.title("Create Your Third Voice AI Account")
+    st.title("🎙️ Join The Third Voice AI")
     st.subheader("Start your journey towards healthier conversations.")
+    
+    # Mission context
+    st.markdown("""
+    > *"When both people are speaking from pain, someone must be the third voice."*
+    
+    **Join thousands rebuilding their most important relationships.**
+    """)
     
     with st.form("signup_form"):
         email = st.text_input("Email", key="signup_email")
-        password = st.text_input("Password", type="password", key="signup_password")
-        signup_button = st.form_submit_button("Sign Up")
+        password = st.text_input("Password (minimum 6 characters)", type="password", key="signup_password")
+        signup_button = st.form_submit_button("Create Account", use_container_width=True)
         
         if signup_button:
-            sign_up(email, password)
+            if len(password) < 6:
+                st.error("Password must be at least 6 characters long.")
+            else:
+                sign_up(email, password)
     
     st.markdown("---")
     st.subheader("Already have an account?")
-    if st.button("Go to Login"):
+    if st.button("Go to Login", use_container_width=True):
         st.session_state.app_mode = "login"
         st.rerun()
+    
+    # Preview what they'll get
+    with st.expander("✨ What you'll get access to", expanded=True):
+        st.markdown("""
+        **🌟 Transform difficult conversations** - Turn anger into understanding
+        
+        **💕 Multi-relationship support** - Romantic, family, workplace, co-parenting, friendships
+        
+        **🎯 Context-aware guidance** - AI understands your specific relationship dynamics
+        
+        **📊 Healing progress tracking** - See your communication improvement over time
+        
+        **💾 Conversation history** - Access all your guided conversations anytime
+        
+        **🚀 Always improving** - Built by a father fighting to heal his own family
+        """)
 
 def render_first_time_screen():
     st.markdown("### 🎙️ Welcome to The Third Voice")
-    st.markdown("Choose a relationship type to get started, or add a custom contact:")
+    st.markdown("**Choose a relationship type to get started, or add a custom contact:**")
     
     cols = st.columns(2)
     contexts_items = list(CONTEXTS.items())
@@ -450,7 +609,7 @@ def render_first_time_screen():
             ):
                 default_names = {
                     "romantic": "Partner",
-                    "coparenting": "Co-parent",
+                    "coparenting": "Co-parent", 
                     "workplace": "Colleague",
                     "family": "Family Member",
                     "friend": "Friend"
@@ -469,7 +628,7 @@ def render_first_time_screen():
         name = st.text_input("Name", placeholder="Sarah, Mom, Dad...", key="first_time_new_contact_name_input")
         context = st.selectbox("Relationship", list(CONTEXTS.keys()), format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}", key="first_time_new_contact_context_select")
         
-        if st.form_submit_button("Add Custom Contact"):
+        if st.form_submit_button("Add Custom Contact", use_container_width=True):
             if name.strip():
                 if save_contact(name.strip(), context):
                     st.session_state.contacts = load_contacts_and_history()
@@ -478,15 +637,38 @@ def render_first_time_screen():
                     st.rerun()
             else:
                 st.error("Contact name cannot be empty.")
+    
+    # Welcome message and feedback
+    st.markdown("---")
+    st.markdown("### 💙 You're About to Transform Your Relationships")
+    st.info("""
+    **The Third Voice AI** helps you navigate emotionally charged conversations with wisdom and love.
+    
+    Whether someone just hurt you, or you're struggling to express yourself without causing pain — 
+    we're here to be that calm, healing voice when both people are speaking from pain.
+    """)
+    
+    # Add feedback widget for first-time experience
+    show_feedback_widget("first_time_setup")
 
 def render_contacts_list_view():
     st.markdown("### 🎙️ The Third Voice - Your Contacts")
     
     if not st.session_state.contacts:
-        st.info("No contacts yet. Add your first contact to get started!")
+        st.info("**No contacts yet.** Add your first contact to get started!")
         if st.button("➕ Add New Contact", use_container_width=True):
             st.session_state.app_mode = "add_contact_view"
             st.rerun()
+        
+        # Show helpful context for new users
+        st.markdown("---")
+        st.markdown("### 💡 How The Third Voice Works")
+        st.markdown("""
+        1. **Add a contact** for someone you communicate with
+        2. **Choose the relationship type** (romantic, family, work, etc.)
+        3. **Share what happened** - their message or your response
+        4. **Get AI guidance** - we'll help you communicate with love and healing
+        """)
         return
     
     # Sort contacts by most recent activity
@@ -496,13 +678,16 @@ def render_contacts_list_view():
         reverse=True
     )
     
+    st.markdown(f"**{len(sorted_contacts)} contact{'s' if len(sorted_contacts) != 1 else ''}** • Tap to continue conversation")
+    
     for name, data in sorted_contacts:
         last_msg = data["history"][-1] if data["history"] else None
-        preview = f"{last_msg['original'][:40]}..." if last_msg and last_msg['original'] else "Start chatting!"
+        preview = f"{last_msg['original'][:40]}..." if last_msg and last_msg['original'] else "Start your first conversation!"
         time_str = last_msg["time"] if last_msg else "New"
+        context_icon = CONTEXTS.get(data["context"], {"icon": "💬"})["icon"]
         
         if st.button(
-            f"**{name}** | {time_str}\n_{preview}_",
+            f"{context_icon} **{name}** • {time_str}\n_{preview}_",
             key=f"contact_{name}",
             use_container_width=True
         ):
@@ -517,6 +702,9 @@ def render_contacts_list_view():
     if st.button("➕ Add New Contact", use_container_width=True):
         st.session_state.app_mode = "add_contact_view"
         st.rerun()
+    
+    # Add feedback widget for contacts experience
+    show_feedback_widget("contacts_list")
 
 def render_add_contact_view():
     st.markdown("### ➕ Add New Contact")
@@ -526,20 +714,22 @@ def render_add_contact_view():
         st.session_state.last_error_message = None
         st.rerun()
     
+    st.markdown("**Tell us about this relationship so we can provide better guidance:**")
+    
     with st.form("add_contact_form"):
-        name = st.text_input("Name", placeholder="Sarah, Mom, Dad...", key="add_contact_name_input_widget")
+        name = st.text_input("Contact Name", placeholder="Sarah, Mom, Dad, Boss...", key="add_contact_name_input_widget")
         context = st.selectbox(
-            "Relationship", 
+            "Relationship Type", 
             list(CONTEXTS.keys()),
-            format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}",
+            format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()} - {CONTEXTS[x]['description']}",
             key="add_contact_context_select_widget"
         )
         
-        if st.form_submit_button("Add Contact"):
+        if st.form_submit_button("Add Contact", use_container_width=True):
             if name.strip():
                 if save_contact(name.strip(), context):
                     st.session_state.contacts = load_contacts_and_history()
-                    st.success(f"Added {name.strip()}")
+                    st.success(f"Added {name.strip()}! Ready to start healing conversations.")
                     st.session_state.app_mode = "contacts_list"
                     st.rerun()
             else:
@@ -636,12 +826,14 @@ def render_conversation_view():
     
     # Input section
     st.markdown("#### 💭 Your Input")
+    st.markdown("*Share what happened - their message or your response that needs guidance*")
+    
     input_value = "" if st.session_state.clear_conversation_input else st.session_state.get("conversation_input_text", "")
     st.text_area(
         "What's happening?",
         value=input_value,
         key="conversation_input_text",
-        placeholder="Share their message or your response...",
+        placeholder="Examples:\n• They said: 'You never listen to me!'\n• I want to tell them: 'I'm frustrated with your attitude'\n• We had a fight about...",
         height=120
     )
     
@@ -651,7 +843,7 @@ def render_conversation_view():
     # Action buttons
     col1, col2 = st.columns([3, 1])
     with col1:
-        if st.button("✨ Transform", key="transform_message", use_container_width=True):
+        if st.button("✨ Transform with Love", key="transform_message", use_container_width=True):
             input_message = st.session_state.conversation_input_text
             process_message(contact_name, input_message, context)
     
@@ -669,7 +861,7 @@ def render_conversation_view():
     st.markdown("---")
     
     # AI Response section
-    st.markdown("#### 🤖 AI Response")
+    st.markdown("#### 🤖 The Third Voice Guidance")
     last_response_key = f"last_response_{contact_name}"
     
     if last_response_key in st.session_state and st.session_state[last_response_key]:
@@ -678,7 +870,7 @@ def render_conversation_view():
         # Show response if it's recent (within 5 minutes)
         if datetime.now().timestamp() - last_resp["timestamp"] < 300:
             with st.container():
-                st.markdown("**AI Guidance:**")
+                st.markdown("**Your AI Guidance:**")
                 st.text_area(
                     "AI Guidance Output",
                     value=last_resp['response'],
@@ -689,24 +881,40 @@ def render_conversation_view():
                     label_visibility="hidden"
                 )
                 
-                col_score, col_model = st.columns([1, 1])
+                col_score, col_model, col_copy = st.columns([2, 2, 1])
                 with col_score:
                     if last_resp["healing_score"] >= 8:
                         st.success(f"✨ Healing Score: {last_resp['healing_score']}/10")
-                    else:
+                    elif last_resp["healing_score"] >= 6:
                         st.info(f"💡 Healing Score: {last_resp['healing_score']}/10")
+                    else:
+                        st.warning(f"🔧 Healing Score: {last_resp['healing_score']}/10")
                 
                 with col_model:
                     st.caption(f"🤖 Model: {last_resp.get('model', 'Unknown')}")
                 
+                with col_copy:
+                    if st.button("📋", help="Click text area above and Ctrl+A to select all", key="copy_hint"):
+                        st.info("💡 Click in text area above, then Ctrl+A and Ctrl+C to copy")
+                
                 if last_resp["healing_score"] >= 8:
                     st.balloons()
+                    st.markdown("🌟 **High healing potential!** This guidance can really help transform your relationship.")
         else:
             # Clear old response
             del st.session_state[last_response_key]
-            st.info("💭 Your AI response will appear here after you click Transform")
+            st.info("💭 Your Third Voice guidance will appear here after you click Transform")
     else:
-        st.info("💭 Your AI response will appear here after you click Transform")
+        st.info("💭 Your Third Voice guidance will appear here after you click Transform")
+        
+        # Show helpful context for new conversations
+        if not history:
+            st.markdown("""
+            **💡 How it works:**
+            - Share what they said or what you want to say
+            - Get compassionate guidance that heals instead of hurts
+            - Build stronger relationships through understanding
+            """)
     
     st.markdown("---")
     
@@ -714,43 +922,73 @@ def render_conversation_view():
     st.markdown("#### 📜 Conversation History")
     
     if history:
-        st.markdown(f"**Recent Messages** ({len(history)} total)")
+        st.markdown(f"**Recent Messages** ({len(history)} total healing conversations)")
         
-        with st.expander("View Chat History", expanded=False):
-            # Show most recent messages first
-            for msg in reversed(history[-10:]):
-                st.markdown(f"""
-                **{msg['time']}** | **{msg['type'].title()}** | Score: {msg['healing_score']}/10
-                """)
+        # Show recent messages in main view
+        for msg in reversed(history[-3:]):  # Show last 3 messages
+            with st.container():
+                col_time, col_score = st.columns([3, 1])
+                with col_time:
+                    st.markdown(f"**{msg['time']}** • {msg['type'].title()}")
+                with col_score:
+                    score_color = "🟢" if msg['healing_score'] >= 8 else "🟡" if msg['healing_score'] >= 6 else "🔴"
+                    st.markdown(f"{score_color} {msg['healing_score']}/10")
                 
-                with st.container():
-                    st.markdown("**Your Message:**")
-                    st.info(msg['original'])
+                st.markdown("**Your Message:**")
+                st.info(msg['original'])
                 
-                if msg['result']:  # Only show AI guidance if it exists
-                    with st.container():
-                        st.markdown("**AI Guidance:**")
-                        st.text_area(
-                            "AI Guidance for History Entry",
-                            value=msg['result'],
-                            height=100,
-                            key=f"history_response_{msg['id']}",
-                            disabled=True,
-                            label_visibility="hidden"
-                        )
-                        st.caption(f"🤖 Model: {msg.get('model', 'Unknown')}")
+                if msg['result']:
+                    st.markdown("**Third Voice Guidance:**")
+                    st.text_area(
+                        "Historical AI Guidance",
+                        value=msg['result'],
+                        height=100,
+                        key=f"history_response_{msg['id']}",
+                        disabled=True,
+                        label_visibility="hidden"
+                    )
                 
                 st.markdown("---")
+        
+        # Expandable full history
+        if len(history) > 3:
+            with st.expander(f"📚 View All {len(history)} Conversations", expanded=False):
+                for msg in reversed(history):
+                    st.markdown(f"""
+                    **{msg['time']}** | **{msg['type'].title()}** | Score: {msg['healing_score']}/10
+                    """)
+                    
+                    with st.container():
+                        st.markdown("**Your Message:**")
+                        st.info(msg['original'])
+                    
+                    if msg['result']:
+                        with st.container():
+                            st.markdown("**Third Voice Guidance:**")
+                            st.text_area(
+                                "Full History AI Guidance",
+                                value=msg['result'],
+                                height=100,
+                                key=f"full_history_response_{msg['id']}",
+                                disabled=True,
+                                label_visibility="hidden"
+                            )
+                            st.caption(f"🤖 Model: {msg.get('model', 'Unknown')}")
+                    
+                    st.markdown("---")
     else:
-        st.info("📝 No chat history yet. Start a conversation above!")
+        st.info("📝 No conversation history yet. Share what's happening above to get your first Third Voice guidance!")
+    
+    # Add feedback widget specific to this conversation experience
+    show_feedback_widget(f"conversation_{contact_name}")
 
 # --- Main Application Flow ---
 def main():
     st.set_page_config(
         page_title="The Third Voice AI",
         page_icon="🎙️",
-        layout="wide",
-        initial_sidebar_state="expanded"
+        layout="centered",  # Changed from "wide" to "centered" for main screen focus
+        initial_sidebar_state="collapsed"  # Changed from "expanded" to "collapsed" for main screen focus
     )
     
     def restore_session():
@@ -772,52 +1010,65 @@ def main():
     
     restore_session()
     
-    # Sidebar
+    # Sidebar - Minimized but available
     with st.sidebar:
-        st.image("https://placehold.co/150x50/ADD8E6/000?text=The+Third+Voice+AI", use_container_width=True)
-        st.title("The Third Voice AI")
+        st.markdown("### 🎙️ The Third Voice AI")
         
         if st.session_state.authenticated:
-            st.write(f"Logged in as: **{st.session_state.user.email}**")
-            st.write(f"User ID: `{st.session_state.user.id[:8]}...`")
+            st.write(f"**{st.session_state.user.email}**")
             
-            if st.button("Logout", use_container_width=True):
+            # Quick navigation if authenticated
+            if st.session_state.app_mode != "contacts_list":
+                if st.button("🏠 My Contacts", use_container_width=True):
+                    st.session_state.app_mode = "contacts_list" 
+                    st.session_state.active_contact = None
+                    st.rerun()
+            
+            if st.button("🚪 Logout", use_container_width=True):
                 sign_out()
         
         st.markdown("---")
-        st.subheader("🚀 Debug Info")
         
-        if st.checkbox("Show Debug Details"):
+        # Mission reminder
+        st.markdown("### 💙 Our Mission")
+        st.markdown("""
+        *"When both people are speaking from pain, someone must be the third voice."*
+        
+        **We help families heal through better conversations.**
+        """)
+        
+        # Debug info (collapsed by default)
+        if st.checkbox("🔧 Debug Info"):
             try:
                 session = supabase.auth.get_session()
                 user_resp = supabase.auth.get_user()
                 user = user_resp.user if user_resp else None
                 
                 debug_info = {
-                    "Connection Status": "Connected" if session else "Not Connected",
+                    "Connection": "✅" if session else "❌",
                     "User ID": user.id[:8] + "..." if user else None,
-                    "User Email": user.email if user else None,
-                    "Contacts Loaded": len(st.session_state.contacts),
-                    "Active Contact": st.session_state.active_contact,
-                    "App Mode": st.session_state.app_mode,
-                    "Secrets Status": {
-                        "Supabase URL": bool(st.secrets.get("supabase", {}).get("url")),
-                        "Supabase Key": bool(st.secrets.get("supabase", {}).get("key")),
-                        "OpenRouter API Key": bool(st.secrets.get("openrouter", {}).get("api_key")),
+                    "Email": user.email if user else None,
+                    "Contacts": len(st.session_state.contacts),
+                    "Active": st.session_state.active_contact,
+                    "Mode": st.session_state.app_mode,
+                    "Secrets": {
+                        "Supabase URL": "✅" if st.secrets.get("supabase", {}).get("url") else "❌",
+                        "Supabase Key": "✅" if st.secrets.get("supabase", {}).get("key") else "❌",
+                        "OpenRouter API": "✅" if st.secrets.get("openrouter", {}).get("api_key") else "❌",
                     }
                 }
                 
                 # Test database connection
                 try:
                     test_query = supabase.table("contacts").select("id").limit(1).execute()
-                    debug_info["Database Test"] = f"OK - {len(test_query.data)} contacts visible"
+                    debug_info["DB Test"] = f"✅ {len(test_query.data)} visible"
                 except Exception as e:
-                    debug_info["Database Test"] = f"Error: {e}"
+                    debug_info["DB Test"] = f"❌ {str(e)[:20]}..."
                 
                 st.code(json.dumps(debug_info, indent=2, default=str), language="json")
                 
             except Exception as e:
-                st.error(f"Error generating debug info: {e}")
+                st.error(f"Debug error: {e}")
     
     # Main content routing
     if st.session_state.authenticated:
@@ -837,6 +1088,8 @@ def main():
     else:
         if st.session_state.app_mode == "signup":
             signup_page()
+        elif st.session_state.app_mode == "verification_notice":
+            verification_notice_page()
         else:
             login_page()
 
