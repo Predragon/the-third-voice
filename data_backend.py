@@ -9,7 +9,7 @@ Built with love and determination from detention.
 
 import streamlit as st
 from supabase import create_client, Client
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 
 # === SUPABASE INITIALIZATION ===
@@ -32,6 +32,43 @@ def init_supabase_connection():
 def get_supabase():
     """Get Supabase client instance"""
     return init_supabase_connection()
+
+
+# === INPUT VALIDATION FUNCTIONS ===
+def validate_sentiment(sentiment):
+    """Validate sentiment against schema constraints"""
+    valid_sentiments = ['positive', 'neutral', 'negative', 'unknown']
+    return sentiment if sentiment in valid_sentiments else 'unknown'
+
+
+def validate_context(context):
+    """Validate context against schema constraints"""
+    valid_contexts = ['romantic', 'coparenting', 'workplace', 'family', 'friend']
+    return context if context in valid_contexts else 'family'
+
+
+def validate_healing_score(score):
+    """Validate healing score is within 0-10 range"""
+    try:
+        score = int(score)
+        return max(0, min(10, score))
+    except (ValueError, TypeError):
+        return 0
+
+
+def validate_message_type(msg_type):
+    """Validate message type against schema constraints"""
+    valid_types = ['incoming', 'coach', 'translate']
+    return msg_type if msg_type in valid_types else 'coach'
+
+
+def validate_rating(rating):
+    """Validate feedback rating is within 1-5 range"""
+    try:
+        rating = int(rating)
+        return max(1, min(5, rating))
+    except (ValueError, TypeError):
+        return 3
 
 
 # === USER SESSION MANAGEMENT ===
@@ -187,16 +224,20 @@ def load_contacts_and_history():
 
 # === CONTACT MANAGEMENT ===
 def save_contact(name, context, contact_id=None):
-    """Save or update a contact"""
+    """Save or update a contact with validation"""
     user_id = get_current_user_id()
     if not user_id or not name.strip():
         st.error("Cannot save contact: User not logged in or invalid input.")
         return False
     
+    # Validate inputs
+    name = name.strip()
+    context = validate_context(context)
+    
     try:
         supabase = get_supabase()
         contact_data = {
-            "name": name.strip(),
+            "name": name,
             "context": context,
             "user_id": user_id,
             "updated_at": datetime.now(timezone.utc).isoformat()
@@ -218,7 +259,7 @@ def save_contact(name, context, contact_id=None):
             return False
             
     except Exception as e:
-        if "duplicate key value violates unique constraint" in str(e):
+        if "duplicate key value violates unique constraint" in str(e) or "contacts_user_name_unique" in str(e):
             st.error(f"A contact with the name '{name}' already exists.")
         else:
             st.error(f"Error saving contact: {e}")
@@ -235,33 +276,44 @@ def delete_contact(contact_id):
     try:
         supabase = get_supabase()
         
-        # Get contact info first
+        # Get contact info first for validation and cleanup
         contact_response = supabase.table("contacts").select("name").eq("id", contact_id).eq("user_id", user_id).execute()
         
-        if contact_response.data:
-            contact_name = contact_response.data[0]["name"]
+        if not contact_response.data:
+            st.error("Contact not found")
+            return False
             
-            # Delete the contact (messages will be cascade deleted due to FK constraint)
-            supabase.table("contacts").delete().eq("id", contact_id).eq("user_id", user_id).execute()
-            
-            # Clear any cached responses
+        contact_name = contact_response.data[0]["name"]
+        
+        # Delete the contact - CASCADE DELETE will handle related records automatically
+        # (if you've run the schema migrations above)
+        delete_response = supabase.table("contacts").delete().eq("id", contact_id).eq("user_id", user_id).execute()
+        
+        if delete_response.data:
+            # Clear any cached responses from session state
             if f"last_response_{contact_name}" in st.session_state:
                 del st.session_state[f"last_response_{contact_name}"]
+            if f"last_interpretation_{contact_name}" in st.session_state:
+                del st.session_state[f"last_interpretation_{contact_name}"]
             
             st.cache_data.clear()
             return True
         else:
-            st.error("Contact not found")
+            st.error("Failed to delete contact")
             return False
             
     except Exception as e:
-        st.error(f"Error deleting contact: {e}")
+        # If we get a foreign key constraint error, CASCADE DELETE isn't set up
+        if "foreign key" in str(e).lower() or "violates" in str(e).lower():
+            st.error("Database needs CASCADE DELETE setup. Please run the schema migrations.")
+        else:
+            st.error(f"Error deleting contact: {e}")
         return False
 
 
 # === MESSAGE MANAGEMENT ===
 def save_message(contact_id, contact_name, message_type, original, result, emotional_state, healing_score, model_used, sentiment="unknown"):
-    """Save a conversation message"""
+    """Save a conversation message with validation"""
     user_id = get_current_user_id()
     if not user_id:
         st.error("Cannot save message: User not logged in.")
@@ -272,13 +324,13 @@ def save_message(contact_id, contact_name, message_type, original, result, emoti
         message_data = {
             "contact_id": contact_id,
             "contact_name": contact_name,
-            "type": message_type,
+            "type": validate_message_type(message_type),
             "original": original,
             "result": result,
             "emotional_state": emotional_state,
-            "healing_score": healing_score,
+            "healing_score": validate_healing_score(healing_score),
             "model": model_used,
-            "sentiment": sentiment,
+            "sentiment": validate_sentiment(sentiment),
             "user_id": user_id,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
@@ -310,7 +362,7 @@ def save_interpretation(contact_id, contact_name, original_message, interpretati
             "contact_name": contact_name,
             "original_message": original_message,
             "interpretation": interpretation,
-            "interpretation_score": interpretation_score,
+            "interpretation_score": validate_healing_score(interpretation_score),
             "model": model_used,
             "user_id": user_id,
             "created_at": datetime.now(timezone.utc).isoformat()
@@ -341,7 +393,7 @@ def get_cached_response(contact_id, message_hash):
         return None
         
     except Exception as e:
-        st.warning(f"Could not check cache: {e}")
+        # Don't show warning for missing cache table
         return None
 
 
@@ -354,17 +406,17 @@ def cache_ai_response(contact_id, message_hash, context, ai_response, healing_sc
     try:
         supabase = get_supabase()
         
-        # Cache expires in 24 hours
-        expires_at = datetime.now(timezone.utc).replace(hour=23, minute=59, second=59)
+        # Cache expires in 24 hours (consistent with schema default approach)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=1)
         
         cache_data = {
             "contact_id": contact_id,
             "message_hash": message_hash,
             "context": context,
             "response": ai_response,
-            "healing_score": healing_score,
+            "healing_score": validate_healing_score(healing_score),
             "model": model_used,
-            "sentiment": sentiment,
+            "sentiment": validate_sentiment(sentiment),
             "emotional_state": emotional_state,
             "user_id": user_id,
             "expires_at": expires_at.isoformat()
@@ -374,7 +426,7 @@ def cache_ai_response(contact_id, message_hash, context, ai_response, healing_sc
         return bool(response.data)
         
     except Exception as e:
-        st.warning(f"Could not cache response: {e}")
+        # Don't show warning for missing cache table
         return False
 
 
@@ -389,7 +441,7 @@ def save_feedback(rating, feedback_text, feature_context="general"):
         supabase = get_supabase()
         feedback_data = {
             "user_id": user_id,
-            "rating": rating,
+            "rating": validate_rating(rating),
             "feedback_text": feedback_text.strip() if feedback_text else None,
             "feature_context": feature_context,
             "created_at": datetime.now(timezone.utc).isoformat()
@@ -414,6 +466,58 @@ def test_database_connection():
         return f"❌ Connection failed: {str(e)[:50]}..."
 
 
+# === UTILITY FUNCTIONS ===
+def cleanup_expired_cache():
+    """Clean up expired cache entries (can be called manually or via cron)"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return False
+    
+    try:
+        supabase = get_supabase()
+        current_time = datetime.now(timezone.utc).isoformat()
+        
+        # Delete expired cache entries for current user
+        response = supabase.table("ai_response_cache").delete().eq("user_id", user_id).lt("expires_at", current_time).execute()
+        
+        return True
+    except Exception as e:
+        st.warning(f"Could not cleanup cache: {e}")
+        return False
+
+
+def get_user_stats():
+    """Get user statistics for dashboard/debugging"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return {}
+    
+    try:
+        supabase = get_supabase()
+        
+        # Get contact count
+        contacts_response = supabase.table("contacts").select("id", count="exact").eq("user_id", user_id).execute()
+        contact_count = contacts_response.count if contacts_response.count else 0
+        
+        # Get message count
+        messages_response = supabase.table("messages").select("id", count="exact").eq("user_id", user_id).execute()
+        message_count = messages_response.count if messages_response.count else 0
+        
+        # Get recent activity
+        recent_messages = supabase.table("messages").select("created_at").eq("user_id", user_id).order("created_at", desc=True).limit(1).execute()
+        last_activity = recent_messages.data[0]["created_at"] if recent_messages.data else None
+        
+        return {
+            "contact_count": contact_count,
+            "message_count": message_count,
+            "last_activity": last_activity
+        }
+        
+    except Exception as e:
+        st.warning(f"Could not load user stats: {e}")
+        return {}
+
+
 # === EXPORT FUNCTIONS FOR MAIN APP ===
 __all__ = [
     'get_supabase',
@@ -431,5 +535,12 @@ __all__ = [
     'get_cached_response',
     'cache_ai_response',
     'save_feedback',
-    'test_database_connection'
+    'test_database_connection',
+    'cleanup_expired_cache',
+    'get_user_stats',
+    'validate_sentiment',
+    'validate_context',
+    'validate_healing_score',
+    'validate_message_type',
+    'validate_rating'
 ]
