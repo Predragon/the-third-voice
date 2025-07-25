@@ -15,7 +15,7 @@ from datetime import datetime
 from enhanced_ai_core import (
     interpret_message, process_ai_transformation, 
     calculate_relationship_health_score, get_healing_insights,
-    create_message_hash, get_ai_cache_key, MODEL
+    create_message_hash, get_ai_cache_key, PRIMARY_MODEL
 )
 from data_backend import (
     get_current_user_id, restore_user_session,
