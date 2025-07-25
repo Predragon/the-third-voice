@@ -15,8 +15,8 @@ CREATE TABLE public.ai_response_cache (
   created_at timestamp with time zone DEFAULT now(),
   expires_at timestamp with time zone DEFAULT (now() + '7 days'::interval),
   CONSTRAINT ai_response_cache_pkey PRIMARY KEY (id),
-  CONSTRAINT ai_response_cache_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
-  CONSTRAINT ai_response_cache_contact_id_fkey FOREIGN KEY (contact_id) REFERENCES public.contacts(id)
+  CONSTRAINT ai_response_cache_contact_id_fkey FOREIGN KEY (contact_id) REFERENCES public.contacts(id),
+  CONSTRAINT ai_response_cache_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.contacts (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -27,6 +27,16 @@ CREATE TABLE public.contacts (
   user_id uuid NOT NULL,
   CONSTRAINT contacts_pkey PRIMARY KEY (id),
   CONSTRAINT contacts_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.feedback (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  rating integer CHECK (rating >= 1 AND rating <= 5),
+  feedback_text text,
+  feature_context text NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT feedback_pkey PRIMARY KEY (id),
+  CONSTRAINT feedback_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.messages (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
