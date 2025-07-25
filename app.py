@@ -12,7 +12,7 @@ import json
 from datetime import datetime
 
 # Import our modularized components
-from ai_core import (
+from enhanced_ai_core import (
     interpret_message, process_ai_transformation, 
     calculate_relationship_health_score, get_healing_insights,
     create_message_hash, get_ai_cache_key, MODEL
