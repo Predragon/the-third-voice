@@ -38,6 +38,20 @@ CREATE TABLE public.feedback (
   CONSTRAINT feedback_pkey PRIMARY KEY (id),
   CONSTRAINT feedback_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
+CREATE TABLE public.interpretations (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  contact_id uuid NOT NULL,
+  contact_name text NOT NULL,
+  original_message text NOT NULL,
+  interpretation text NOT NULL,
+  interpretation_score integer CHECK (interpretation_score >= 0 AND interpretation_score <= 10),
+  model text NOT NULL,
+  user_id uuid NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT interpretations_pkey PRIMARY KEY (id),
+  CONSTRAINT interpretations_contact_id_fkey FOREIGN KEY (contact_id) REFERENCES public.contacts(id),
+  CONSTRAINT interpretations_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
 CREATE TABLE public.messages (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   contact_id uuid NOT NULL,
@@ -52,6 +66,6 @@ CREATE TABLE public.messages (
   created_at timestamp with time zone DEFAULT now(),
   user_id uuid NOT NULL,
   CONSTRAINT messages_pkey PRIMARY KEY (id),
-  CONSTRAINT messages_contact_id_fkey FOREIGN KEY (contact_id) REFERENCES public.contacts(id),
-  CONSTRAINT messages_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+  CONSTRAINT messages_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT messages_contact_id_fkey FOREIGN KEY (contact_id) REFERENCES public.contacts(id)
 );
