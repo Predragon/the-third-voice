@@ -766,15 +766,15 @@ def render_conversation_view():
         st.session_state.app_mode = "contacts_list"
         st.rerun()
         return
-    
+
     contact_name = st.session_state.active_contact
     contact_data = st.session_state.contacts.get(contact_name, {"context": "family", "history": [], "id": None})
     context = contact_data["context"]
     history = contact_data["history"]
     contact_id = contact_data.get("id")
-    
+
     st.markdown(f"### {CONTEXTS[context]['icon']} {contact_name} - {CONTEXTS[context]['description']}")
-    
+
     # Navigation buttons
     back_col, edit_col, _ = st.columns([2, 2, 6])
     with back_col:
@@ -784,7 +784,7 @@ def render_conversation_view():
             st.session_state.last_error_message = None
             st.session_state.clear_conversation_input = False
             st.rerun()
-    
+
     with edit_col:
         if st.button("✏️ Edit", key="edit_current_contact", use_container_width=True):
             st.session_state.edit_contact = {
@@ -794,9 +794,9 @@ def render_conversation_view():
             }
             st.session_state.app_mode = "edit_contact_view"
             st.rerun()
-    
+
     st.markdown("---")
-    
+
     # Input section
     st.markdown("#### 💭 Your Input")
     input_value = "" if st.session_state.clear_conversation_input else st.session_state.get("conversation_input_text", "")
@@ -807,37 +807,35 @@ def render_conversation_view():
         placeholder="Share their message or your response...",
         height=120
     )
-    
+
     if st.session_state.clear_conversation_input:
         st.session_state.clear_conversation_input = False
-    
+
     # Action buttons
-    col1, col2 = st.columns([3, 1])
+    col1, col2 = st.columns([3, 3])
     with col1:
-        if st.button("✨ Transform", key="transform_message", use_container_width=True):
+        if st.button("🗣️ Coach My Message", key="btn_coach", use_container_width=True):
             input_message = st.session_state.conversation_input_text
-            process_message(contact_name, input_message, context)
-    
+            process_message(contact_name, input_message, context, mode="coach")
+
     with col2:
-        if st.button("🗑️ Clear", key="clear_input_btn", use_container_width=True):
-            st.session_state.conversation_input_text = ""
-            st.session_state.clear_conversation_input = False
-            st.session_state.last_error_message = None
-            st.rerun()
-    
+        if st.button("📩 Analyze What They Said", key="btn_translate", use_container_width=True):
+            input_message = st.session_state.conversation_input_text
+            process_message(contact_name, input_message, context, mode="translate")
+
+    st.markdown("---")
+
     # Error display
     if st.session_state.last_error_message:
         st.error(st.session_state.last_error_message)
-    
-    st.markdown("---")
-    
+
     # AI Response section
     st.markdown("#### 🤖 AI Response")
     last_response_key = f"last_response_{contact_name}"
-    
+
     if last_response_key in st.session_state and st.session_state[last_response_key]:
         last_resp = st.session_state[last_response_key]
-        
+
         # Show response if it's recent (within 5 minutes)
         if datetime.now().timestamp() - last_resp["timestamp"] < 300:
             with st.container():
@@ -845,55 +843,52 @@ def render_conversation_view():
                 st.text_area(
                     "AI Guidance Output",
                     value=last_resp['response'],
-                    height=100,  # Made slightly shorter
+                    height=100,
                     key="ai_response_display",
                     help="Click inside and Ctrl+A to select all, then Ctrl+C to copy",
                     disabled=False,
                     label_visibility="hidden"
                 )
-                
+
                 st.markdown("---")
                 st.markdown("**Emotional Insights:**")
                 st.info(last_resp.get("ai_analysis_text", "No detailed analysis available."))
-                
-                score_col, model_col, sentiment_col, emotion_col = st.columns(4)  # More columns for details
-                
+
+                score_col, model_col, sentiment_col, emotion_col = st.columns(4)
+
                 with score_col:
                     if last_resp["healing_score"] >= 8:
                         st.success(f"✨ Score: {last_resp['healing_score']}/10")
                     else:
                         st.info(f"💡 Score: {last_resp['healing_score']}/10")
-                
+
                 with model_col:
                     st.caption(f"🤖 Model: {last_resp.get('model', 'Unknown')}")
-                
+
                 with sentiment_col:
                     st.caption(f"📊 Sentiment: **{last_resp.get('sentiment', 'unknown').title()}**")
-                
+
                 with emotion_col:
                     st.caption(f"❤️ Emotion: **{last_resp.get('detected_emotion_label', 'unknown').title()}**")
-                
+
                 if last_resp["healing_score"] >= 8:
                     st.balloons()
         else:
-            # Clear old response
             del st.session_state[last_response_key]
-            st.info("💭 Your AI response will appear here after you click Transform")
+            st.info("💭 Your AI response will appear here after you click a button")
     else:
-        st.info("💭 Your AI response will appear here after you click Transform")
-    
+        st.info("💭 Your AI response will appear here after you click a button")
+
     st.markdown("---")
-    
+
     # Conversation History
     st.markdown("#### 📜 Conversation History")
-    
+
     if history:
         st.markdown(f"**Recent Messages** ({len(history)} total)")
-        
+
         with st.expander("View Chat History", expanded=False):
-            # Show most recent messages first
             for msg in reversed(history[-10:]):
-                # Using columns for better alignment of details in history
                 msg_time_col, msg_type_col, msg_score_col = st.columns([2, 2, 2])
                 with msg_time_col:
                     st.markdown(f"**{msg['time']}**")
@@ -901,12 +896,12 @@ def render_conversation_view():
                     st.markdown(f"**{msg['type'].title()}**")
                 with msg_score_col:
                     st.markdown(f"Score: {msg['healing_score']}/10")
-                
+
                 with st.container():
                     st.markdown("**Your Input:**")
                     st.info(msg['original'])
-                
-                if msg['result']:  # Only show AI guidance if it exists
+
+                if msg['result']:
                     with st.container():
                         st.markdown("**AI Guided Message:**")
                         st.text_area(
@@ -919,7 +914,7 @@ def render_conversation_view():
                         )
                         st.markdown("**Emotional Insight:**")
                         st.caption(msg.get('ai_analysis_text', 'No detailed analysis.'))
-                        
+
                         hist_model_col, hist_sentiment_col, hist_emotion_col = st.columns(3)
                         with hist_model_col:
                             st.caption(f"🤖 Model: {msg.get('model', 'Unknown')}")
@@ -931,7 +926,7 @@ def render_conversation_view():
                 st.markdown("---")
     else:
         st.info("📝 No chat history yet. Start a conversation above!")
-
+	
 # --- Main Application Flow ---
 def main():
     st.set_page_config(
