@@ -699,4 +699,15 @@ def render_conversation_view():
                 col_score, col_model, col_copy = st.columns([2, 2, 1])
                 with col_score:
                     if last_resp["healing_score"] >= 8:
-                        st.success(f"✨ Healing Score
+                        st.success(f"✨ Healing Score: {last_resp['healing_score']}/10 - Transformative guidance")
+                    elif last_resp["healing_score"] >= 6:
+                        st.info(f"💙 Healing Score: {last_resp['healing_score']}/10 - Good guidance")
+                    else:
+                        st.warning(f"⚠️ Healing Score: {last_resp['healing_score']}/10 - Basic guidance")
+                
+                with col_model:
+                    st.caption(f"Model: {last_resp['model']}")
+                
+                with col_copy:
+                    if st.button("📋 Copy", key="copy_response"):
+                        st.info("Click inside the text area above, Ctrl+A to select all, then Ctrl+C to copy")
