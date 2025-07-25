@@ -15,7 +15,8 @@ from datetime import datetime
 from ai_core import (
     interpret_message, process_ai_transformation, 
     calculate_relationship_health_score, get_healing_insights,
-    create_message_hash, get_ai_cache_key, PRIMARY_MODEL
+    create_message_hash, get_ai_cache_key, PRIMARY_MODEL,
+    get_model_status_info
 )
 from data_backend import (
     get_current_user_id, restore_user_session,
@@ -25,6 +26,8 @@ from data_backend import (
     cache_ai_response, save_feedback, test_database_connection
 )
 
+# Model consistency fix
+MODEL = PRIMARY_MODEL
 
 # === CONSTANTS ===
 CONTEXTS = {
@@ -711,3 +714,274 @@ def render_conversation_view():
                 with col_copy:
                     if st.button("📋 Copy", key="copy_response"):
                         st.info("Click inside the text area above, Ctrl+A to select all, then Ctrl+C to copy")
+        else:
+            # Clear old response
+            del st.session_state[last_response_key]
+    else:
+        st.info("💡 Enter a message above and click **Transform with Love** to get AI guidance for healing communication.")
+    
+    st.markdown("---")
+    
+    # Conversation history section
+    if history:
+        st.markdown("#### 📚 Recent Conversations")
+        with st.expander(f"View {len(history)} conversation{'s' if len(history) != 1 else ''}", expanded=False):
+            # Show last 10 conversations in reverse chronological order
+            recent_history = history[-10:][::-1]
+            
+            for i, msg in enumerate(recent_history):
+                col_time, col_score = st.columns([3, 1])
+                
+                with col_time:
+                    st.markdown(f"**{msg['time']}** - {msg['type'].title()}")
+                
+                with col_score:
+                    if msg.get('healing_score', 0) > 0:
+                        score_color = "🟢" if msg['healing_score'] >= 7 else "🟡" if msg['healing_score'] >= 5 else "🔴"
+                        st.markdown(f"{score_color} {msg['healing_score']}/10")
+                
+                st.markdown(f"**Input:** {msg['original'][:100]}{'...' if len(msg['original']) > 100 else ''}")
+                
+                if msg.get('result'):
+                    st.markdown(f"**Response:** {msg['result'][:150]}{'...' if len(msg['result']) > 150 else ''}")
+                
+                if i < len(recent_history) - 1:
+                    st.markdown("---")
+    
+    # Add conversation-specific feedback
+    show_feedback_widget(f"conversation_{contact_name}")
+
+
+# === MAIN APPLICATION ROUTER ===
+def main_app():
+    """Main application routing and logic"""
+    
+    # Try to restore session first
+    if not st.session_state.get("authenticated", False):
+        restore_user_session()
+    
+    # Handle verification notice display
+    if st.session_state.get("show_verification_notice", False):
+        verification_notice_page()
+        return
+    
+    # Authentication check
+    if not st.session_state.get("authenticated", False):
+        if st.session_state.app_mode == "signup":
+            signup_page()
+        else:
+            login_page()
+        return
+    
+    # Main authenticated app routing
+    app_mode = st.session_state.get("app_mode", "contacts_list")
+    
+    if app_mode == "first_time_setup":
+        render_first_time_screen()
+    elif app_mode == "contacts_list":
+        render_contacts_list_view()
+    elif app_mode == "add_contact_view":
+        render_add_contact_view()
+    elif app_mode == "edit_contact_view":
+        render_edit_contact_view()
+    elif app_mode == "conversation_view":
+        render_conversation_view()
+    else:
+        # Fallback to contacts list for unknown modes
+        st.session_state.app_mode = "contacts_list"
+        st.rerun()
+
+
+# === SIDEBAR WITH USER INFO AND DEBUG ===
+def render_sidebar():
+    """Render sidebar with user info and debug information"""
+    if not st.session_state.get("authenticated", False):
+        return
+    
+    with st.sidebar:
+        st.markdown("### 👤 User Info")
+        
+        user_email = st.session_state.user.email if st.session_state.user else "Unknown"
+        st.markdown(f"**Email:** {user_email}")
+        
+        # User stats
+        try:
+            from data_backend import get_user_stats
+            stats = get_user_stats()
+            if stats:
+                st.markdown(f"**Contacts:** {stats.get('contact_count', 0)}")
+                st.markdown(f"**Messages:** {stats.get('message_count', 0)}")
+                if stats.get('last_activity'):
+                    last_activity = datetime.fromisoformat(stats['last_activity'].replace('Z', '+00:00'))
+                    st.markdown(f"**Last Active:** {last_activity.strftime('%m/%d %H:%M')}")
+        except:
+            pass
+        
+        st.markdown("---")
+        
+        # Sign out button
+        if st.button("🚪 Sign Out", use_container_width=True):
+            if sign_out():
+                st.rerun()
+        
+        st.markdown("---")
+        
+        # Debug section
+        with st.expander("🔧 Debug Info", expanded=False):
+            st.markdown(f"**App Mode:** {st.session_state.get('app_mode', 'Unknown')}")
+            st.markdown(f"**Active Contact:** {st.session_state.get('active_contact', 'None')}")
+            st.markdown(f"**Total Contacts:** {len(st.session_state.get('contacts', {}))}")
+            
+            # Database connection test
+            db_status = test_database_connection()
+            st.markdown(f"**Database:** {db_status}")
+            
+            # Model status
+            try:
+                model_info = get_model_status_info()
+                st.markdown(f"**AI Model:** {model_info}")
+            except:
+                st.markdown(f"**AI Model:** {MODEL}")
+        
+        st.markdown("---")
+        st.markdown("### 💙 Mission")
+        st.markdown("*Building healing conversations, one family at a time.*")
+        
+        st.markdown("**Built with love by a father fighting to return to his daughter.**")
+
+
+# === PAGE CONFIGURATION ===
+def configure_page():
+    """Configure Streamlit page settings and mobile optimization"""
+    st.set_page_config(
+        page_title="The Third Voice AI - Family Healing Through Better Communication",
+        page_icon="🎙️",
+        layout="wide",
+        initial_sidebar_state="collapsed",
+        menu_items={
+            'Get Help': None,
+            'Report a bug': None,
+            'About': "The Third Voice AI - When both people are speaking from pain, someone must be the third voice."
+        }
+    )
+    
+    # Mobile-optimized CSS
+    st.markdown("""
+    <style>
+        /* Hide Streamlit branding and optimize for mobile */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        
+        /* Mobile-first responsive design */
+        .main .block-container {
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
+            max-width: 100%;
+        }
+        
+        /* Button styling for better mobile interaction */
+        .stButton > button {
+            width: 100%;
+            border-radius: 8px;
+            border: none;
+            padding: 0.75rem 1rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .stButton > button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        /* Text area improvements */
+        .stTextArea > div > div > textarea {
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+            font-size: 16px;
+        }
+        
+        .stTextArea > div > div > textarea:focus {
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+        }
+        
+        /* Form styling */
+        .stForm {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 1rem;
+            background: #fafafa;
+        }
+        
+        /* Expander styling */
+        .streamlit-expanderHeader {
+            border-radius: 8px;
+            background-color: #f0f2f6;
+        }
+        
+        /* Metric styling */
+        [data-testid="metric-container"] {
+            background-color: #f0f2f6;
+            border: 1px solid #e0e0e0;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        /* Success/error message styling */
+        .stSuccess, .stError, .stWarning, .stInfo {
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        
+        /* Mobile-specific adjustments */
+        @media (max-width: 768px) {
+            .main .block-container {
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
+            }
+            
+            h1, h2, h3 {
+                font-size: 1.2em !important;
+                line-height: 1.3;
+            }
+            
+            .stButton > button {
+                padding: 0.6rem 0.8rem;
+                font-size: 14px;
+            }
+        }
+        
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            .stForm {
+                background: #2b2b2b;
+                border-color: #404040;
+            }
+            
+            [data-testid="metric-container"] {
+                background-color: #2b2b2b;
+                border-color: #404040;
+            }
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+
+# === MAIN EXECUTION ===
+if __name__ == "__main__":
+    # Configure page first
+    configure_page()
+    
+    # Initialize session state
+    init_session_state()
+    
+    # Render sidebar (only when authenticated)
+    render_sidebar()
+    
+    # Run main application
+    main_app()
