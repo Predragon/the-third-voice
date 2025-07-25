@@ -15,20 +15,16 @@ from datetime import datetime
 from ai_core import (
     interpret_message, process_ai_transformation, 
     calculate_relationship_health_score, get_healing_insights,
-    create_message_hash, get_ai_cache_key, PRIMARY_MODEL,
-    get_model_status_info
+    create_message_hash, get_ai_cache_key, PRIMARY_MODEL
 )
 from data_backend import (
     get_current_user_id, restore_user_session,
     sign_up, sign_in, sign_out, resend_verification_email,
     load_contacts_and_history, save_contact, delete_contact,
     save_message, save_interpretation, get_cached_response, 
-    cache_ai_response, save_feedback, test_database_connection,
-    get_user_stats
+    cache_ai_response, save_feedback, test_database_connection
 )
 
-# Model consistency fix
-MODEL = PRIMARY_MODEL
 
 # === CONSTANTS ===
 CONTEXTS = {
@@ -38,191 +34,6 @@ CONTEXTS = {
     "family": {"icon": "🏠", "description": "Extended family connections"},
     "friend": {"icon": "🤝", "description": "Friendships & social bonds"}
 }
-
-
-# === PAGE CONFIGURATION ===
-def configure_page():
-    """Configure Streamlit page settings and mobile optimization"""
-    st.set_page_config(
-        page_title="The Third Voice AI - Family Healing Through Better Communication",
-        page_icon="🎙️",
-        layout="wide",
-        initial_sidebar_state="expanded",  # Fixed: Changed from "collapsed" to "expanded"
-        menu_items={
-            'Get Help': None,
-            'Report a bug': None,
-            'About': "The Third Voice AI - When both people are speaking from pain, someone must be the third voice."
-        }
-    )
-    
-    # Mobile-optimized CSS with proper colors
-    st.markdown("""
-    <style>
-        /* Hide Streamlit branding and optimize for mobile */
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-        
-        /* Main container styling */
-        .main .block-container {
-            padding-top: 1rem;
-            padding-bottom: 1rem;
-            padding-left: 1rem;
-            padding-right: 1rem;
-            max-width: 100%;
-        }
-        
-        /* Button styling for better mobile interaction */
-        .stButton > button {
-            width: 100%;
-            border-radius: 8px;
-            border: none;
-            padding: 0.75rem 1rem;
-            font-weight: 500;
-            transition: all 0.2s ease;
-            background-color: #4CAF50;
-            color: white;
-        }
-        
-        .stButton > button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            background-color: #45a049;
-        }
-        
-        /* Primary action buttons */
-        .stButton > button[kind="primary"] {
-            background-color: #2196F3;
-        }
-        
-        .stButton > button[kind="primary"]:hover {
-            background-color: #1976D2;
-        }
-        
-        /* Text area improvements */
-        .stTextArea > div > div > textarea {
-            border-radius: 8px;
-            border: 2px solid #e0e0e0;
-            font-size: 16px;
-            background-color: white;
-        }
-        
-        .stTextArea > div > div > textarea:focus {
-            border-color: #4CAF50;
-            box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
-        }
-        
-        /* Form styling */
-        .stForm {
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 1rem;
-            background: #fafafa;
-            margin: 1rem 0;
-        }
-        
-        /* Expander styling */
-        .streamlit-expanderHeader {
-            border-radius: 8px;
-            background-color: #f0f2f6;
-            border: 1px solid #e0e0e0;
-        }
-        
-        /* Metric styling */
-        [data-testid="metric-container"] {
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            padding: 1rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        
-        /* Success/error message styling */
-        .stSuccess {
-            background-color: #d4edda;
-            border: 1px solid #c3e6cb;
-            color: #155724;
-            border-radius: 8px;
-            padding: 1rem;
-        }
-        
-        .stError {
-            background-color: #f8d7da;
-            border: 1px solid #f5c6cb;
-            color: #721c24;
-            border-radius: 8px;
-            padding: 1rem;
-        }
-        
-        .stWarning {
-            background-color: #fff3cd;
-            border: 1px solid #ffeaa7;
-            color: #856404;
-            border-radius: 8px;
-            padding: 1rem;
-        }
-        
-        .stInfo {
-            background-color: #d1ecf1;
-            border: 1px solid #bee5eb;
-            color: #0c5460;
-            border-radius: 8px;
-            padding: 1rem;
-        }
-        
-        /* Sidebar styling */
-        .css-1d391kg {
-            background-color: #f8f9fa;
-        }
-        
-        /* Input field styling */
-        .stTextInput > div > div > input {
-            border-radius: 8px;
-            border: 2px solid #e0e0e0;
-            background-color: white;
-        }
-        
-        .stTextInput > div > div > input:focus {
-            border-color: #4CAF50;
-            box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
-        }
-        
-        /* Select box styling */
-        .stSelectbox > div > div > select {
-            border-radius: 8px;
-            border: 2px solid #e0e0e0;
-            background-color: white;
-        }
-        
-        /* Mobile-specific adjustments */
-        @media (max-width: 768px) {
-            .main .block-container {
-                padding-left: 0.5rem;
-                padding-right: 0.5rem;
-            }
-            
-            h1, h2, h3 {
-                font-size: 1.2em !important;
-                line-height: 1.3;
-            }
-            
-            .stButton > button {
-                padding: 0.6rem 0.8rem;
-                font-size: 14px;
-            }
-        }
-        
-        /* Ensure proper background colors */
-        .main {
-            background-color: white;
-        }
-        
-        /* Card-like containers */
-        .element-container {
-            background-color: white;
-        }
-    </style>
-    """, unsafe_allow_html=True)
 
 
 # === SESSION STATE INITIALIZATION ===
@@ -248,63 +59,6 @@ def init_session_state():
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
-
-
-# === SIDEBAR WITH USER INFO AND DEBUG ===
-def render_sidebar():
-    """Render sidebar with user info and debug information"""
-    if not st.session_state.get("authenticated", False):
-        return
-    
-    with st.sidebar:
-        st.markdown("### 👤 User Info")
-        
-        user_email = st.session_state.user.email if st.session_state.user else "Unknown"
-        st.markdown(f"**Email:** {user_email}")
-        
-        # User stats
-        try:
-            stats = get_user_stats()
-            if stats:
-                st.markdown(f"**Contacts:** {stats.get('contact_count', 0)}")
-                st.markdown(f"**Messages:** {stats.get('message_count', 0)}")
-                if stats.get('last_activity'):
-                    last_activity = datetime.fromisoformat(stats['last_activity'].replace('Z', '+00:00'))
-                    st.markdown(f"**Last Active:** {last_activity.strftime('%m/%d %H:%M')}")
-        except Exception as e:
-            st.markdown("*Stats loading...*")
-        
-        st.markdown("---")
-        
-        # Sign out button
-        if st.button("🚪 Sign Out", use_container_width=True):
-            if sign_out():
-                st.rerun()
-        
-        st.markdown("---")
-        
-        # Debug section
-        with st.expander("🔧 Debug Info", expanded=False):
-            st.markdown(f"**App Mode:** {st.session_state.get('app_mode', 'Unknown')}")
-            st.markdown(f"**Active Contact:** {st.session_state.get('active_contact', 'None')}")
-            st.markdown(f"**Total Contacts:** {len(st.session_state.get('contacts', {}))}")
-            
-            # Database connection test
-            db_status = test_database_connection()
-            st.markdown(f"**Database:** {db_status}")
-            
-            # Model status
-            try:
-                model_info = get_model_status_info()
-                st.markdown(f"**AI Model:** {model_info}")
-            except:
-                st.markdown(f"**AI Model:** {MODEL}")
-        
-        st.markdown("---")
-        st.markdown("### 💙 Mission")
-        st.markdown("*Building healing conversations, one family at a time.*")
-        
-        st.markdown("**Built with love by a father fighting to return to his daughter.**")
 
 
 # === FEEDBACK SYSTEM UI ===
@@ -489,292 +243,6 @@ def display_relationship_progress(contact_name, history):
             if recent_scores:
                 trend_text = " → ".join([str(score) for score in recent_scores])
                 st.markdown(f"**Recent Healing Scores:** {trend_text}")
-
-
-# === ADD CONTACT VIEW ===
-def render_add_contact_view():
-    st.markdown("### ➕ Add New Contact")
-    
-    if st.button("← Back to Contacts", key="back_to_contacts", use_container_width=True):
-        st.session_state.app_mode = "contacts_list"
-        st.session_state.last_error_message = None
-        st.rerun()
-    
-    st.markdown("**Tell us about this relationship so we can provide better guidance:**")
-    
-    with st.form("add_contact_form"):
-        name = st.text_input("Contact Name", placeholder="Sarah, Mom, Dad, Boss...", key="add_contact_name_input_widget")
-        context = st.selectbox(
-            "Relationship Type", 
-            list(CONTEXTS.keys()),
-            format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()} - {CONTEXTS[x]['description']}",
-            key="add_contact_context_select_widget"
-        )
-        
-        if st.form_submit_button("Add Contact", use_container_width=True):
-            if name.strip():
-                if save_contact(name.strip(), context):
-                    st.session_state.contacts = load_contacts_and_history()
-                    st.success(f"Added {name.strip()}! Ready to start healing conversations.")
-                    st.session_state.app_mode = "contacts_list"
-                    st.rerun()
-            else:
-                st.error("Contact name cannot be empty.")
-
-
-def render_edit_contact_view():
-    if not st.session_state.edit_contact:
-        st.session_state.app_mode = "contacts_list"
-        st.rerun()
-        return
-    
-    contact = st.session_state.edit_contact
-    st.markdown(f"### ✏️ Edit Contact: {contact['name']}")
-    
-    if st.button("← Back", key="back_to_conversation", use_container_width=True):
-        st.session_state.app_mode = "conversation_view"
-        st.session_state.edit_contact = None
-        st.rerun()
-    
-    with st.form("edit_contact_form"):
-        name_input = st.text_input("Name", value=contact["name"], key="edit_contact_name_input_widget")
-        
-        context_options = list(CONTEXTS.keys())
-        initial_context_index = context_options.index(contact["context"]) if contact["context"] in context_options else 0
-        context = st.selectbox(
-            "Relationship", 
-            context_options,
-            index=initial_context_index,
-            format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}",
-            key="edit_contact_context_select"
-        )
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.form_submit_button("💾 Save Changes"):
-                new_name = name_input.strip()
-                if not new_name:
-                    st.error("Contact name cannot be empty.")
-                elif save_contact(new_name, context, contact["id"]):
-                    if st.session_state.active_contact == contact["name"]:
-                        st.session_state.active_contact = new_name
-                    st.success(f"Updated {new_name}")
-                    st.session_state.contacts = load_contacts_and_history()
-                    st.session_state.app_mode = "conversation_view"
-                    st.session_state.edit_contact = None
-                    st.rerun()
-        
-        with col2:
-            if st.form_submit_button("🗑️ Delete Contact"):
-                if delete_contact(contact["id"]):
-                    st.success(f"Deleted contact: {contact['name']}")
-                    st.session_state.contacts = load_contacts_and_history()
-                    st.session_state.app_mode = "contacts_list"
-                    st.session_state.active_contact = None
-                    st.session_state.edit_contact = None
-                    st.rerun()
-
-
-def render_conversation_view():
-    """The heart of our app - where healing happens"""
-    if not st.session_state.active_contact:
-        st.session_state.app_mode = "contacts_list"
-        st.rerun()
-        return
-    
-    contact_name = st.session_state.active_contact
-    contact_data = st.session_state.contacts.get(contact_name, {"context": "family", "history": [], "id": None})
-    context = contact_data["context"]
-    history = contact_data["history"]
-    contact_id = contact_data.get("id")
-    
-    st.markdown(f"### {CONTEXTS[context]['icon']} {contact_name} - {CONTEXTS[context]['description']}")
-    
-    # Navigation buttons
-    back_col, edit_col, _ = st.columns([2, 2, 6])
-    with back_col:
-        if st.button("← Back", key="back_btn", use_container_width=True):
-            st.session_state.app_mode = "contacts_list"
-            st.session_state.active_contact = None
-            st.session_state.last_error_message = None
-            st.session_state.clear_conversation_input = False
-            st.rerun()
-    
-    with edit_col:
-        if st.button("✏️ Edit", key="edit_current_contact", use_container_width=True):
-            st.session_state.edit_contact = {
-                "id": contact_id,
-                "name": contact_name,
-                "context": context
-            }
-            st.session_state.app_mode = "edit_contact_view"
-            st.rerun()
-    
-    # Relationship progress section
-    display_relationship_progress(contact_name, history)
-    
-    st.markdown("---")
-    
-    # Input section
-    st.markdown("#### 💭 Your Input")
-    st.markdown("*Share what happened - their message or your response that needs guidance*")
-    
-    input_value = "" if st.session_state.clear_conversation_input else st.session_state.get("conversation_input_text", "")
-    st.text_area(
-        "What's happening?",
-        value=input_value,
-        key="conversation_input_text",
-        placeholder="Examples:\n• They said: 'You never listen to me!'\n• I want to tell them: 'I'm frustrated with your attitude'\n• We had a fight about...",
-        height=120
-    )
-    
-    if st.session_state.clear_conversation_input:
-        st.session_state.clear_conversation_input = False
-    
-    # Action buttons
-    current_message = st.session_state.conversation_input_text
-    
-    col1, col2, col3 = st.columns([2, 2, 1])
-    with col1:
-        if st.button("✨ Transform with Love", key="transform_message", use_container_width=True):
-            process_message(contact_name, current_message, context)
-    
-    with col2:
-        # Interpret button
-        if current_message.strip():
-            render_interpret_section(contact_name, current_message, context, history)
-        else:
-            st.button("🔍 Interpret", disabled=True, help="Enter a message first", use_container_width=True)
-    
-    with col3:
-        if st.button("🗑️ Clear", key="clear_input_btn", use_container_width=True):
-            st.session_state.conversation_input_text = ""
-            st.session_state.clear_conversation_input = False
-            st.session_state.last_error_message = None
-            st.rerun()
-    
-    # Error display
-    if st.session_state.last_error_message:
-        st.error(st.session_state.last_error_message)
-    
-    # Show interpretation results if available
-    display_interpretation_result(contact_name)
-    
-    st.markdown("---")
-    
-    # AI Response section
-    st.markdown("#### 🤖 The Third Voice Guidance")
-    last_response_key = f"last_response_{contact_name}"
-    
-    if last_response_key in st.session_state and st.session_state[last_response_key]:
-        last_resp = st.session_state[last_response_key]
-        
-        # Show response if it's recent (within 5 minutes)
-        if datetime.now().timestamp() - last_resp["timestamp"] < 300:
-            with st.container():
-                st.markdown("**Your AI Guidance:**")
-                st.text_area(
-                    "AI Guidance Output",
-                    value=last_resp['response'],
-                    height=200,
-                    key="ai_response_display",
-                    help="Click inside and Ctrl+A to select all, then Ctrl+C to copy",
-                    disabled=False,
-                    label_visibility="hidden"
-                )
-                
-                col_score, col_model, col_copy = st.columns([2, 2, 1])
-                with col_score:
-                    if last_resp["healing_score"] >= 8:
-                        st.success(f"✨ Healing Score: {last_resp['healing_score']}/10 - Transformative guidance")
-                    elif last_resp["healing_score"] >= 6:
-                        st.info(f"💙 Healing Score: {last_resp['healing_score']}/10 - Good guidance")
-                    else:
-                        st.warning(f"⚠️ Healing Score: {last_resp['healing_score']}/10 - Basic guidance")
-                
-                with col_model:
-                    st.caption(f"Model: {last_resp['model']}")
-                
-                with col_copy:
-                    if st.button("📋 Copy", key="copy_response"):
-                        st.info("Click inside the text area above, Ctrl+A to select all, then Ctrl+C to copy")
-        else:
-            # Clear old response
-            del st.session_state[last_response_key]
-    else:
-        st.info("💡 Enter a message above and click **Transform with Love** to get AI guidance for healing communication.")
-    
-    st.markdown("---")
-    
-    # Conversation history section
-    if history:
-        st.markdown("#### 📚 Recent Conversations")
-        with st.expander(f"View {len(history)} conversation{'s' if len(history) != 1 else ''}", expanded=False):
-            # Show last 10 conversations in reverse chronological order
-            recent_history = history[-10:][::-1]
-            
-            for i, msg in enumerate(recent_history):
-                col_time, col_score = st.columns([3, 1])
-                
-                with col_time:
-                    st.markdown(f"**{msg['time']}** - {msg['type'].title()}")
-                
-                with col_score:
-                    if msg.get('healing_score', 0) > 0:
-                        score_color = "🟢" if msg['healing_score'] >= 7 else "🟡" if msg['healing_score'] >= 5 else "🔴"
-                        st.markdown(f"{score_color} {msg['healing_score']}/10")
-                
-                st.markdown(f"**Input:** {msg['original'][:100]}{'...' if len(msg['original']) > 100 else ''}")
-                
-                if msg.get('result'):
-                    st.markdown(f"**Response:** {msg['result'][:150]}{'...' if len(msg['result']) > 150 else ''}")
-                
-                if i < len(recent_history) - 1:
-                    st.markdown("---")
-    
-    # Add conversation-specific feedback
-    show_feedback_widget(f"conversation_{contact_name}")
-
-
-# === MAIN APPLICATION ROUTER ===
-def main_app():
-    """Main application routing and logic"""
-    
-    # Try to restore session first
-    if not st.session_state.get("authenticated", False):
-        restore_user_session()
-    
-    # Handle verification notice display
-    if st.session_state.get("show_verification_notice", False):
-        verification_notice_page()
-        return
-    
-    # Authentication check
-    if not st.session_state.get("authenticated", False):
-        if st.session_state.app_mode == "signup":
-            signup_page()
-        else:
-            login_page()
-        return
-    
-    # Main authenticated app routing
-    app_mode = st.session_state.get("app_mode", "contacts_list")
-    
-    if app_mode == "first_time_setup":
-        render_first_time_screen()
-    elif app_mode == "contacts_list":
-        render_contacts_list_view()
-    elif app_mode == "add_contact_view":
-        render_add_contact_view()
-    elif app_mode == "edit_contact_view":
-        render_edit_contact_view()
-    elif app_mode == "conversation_view":
-        render_conversation_view()
-    else:
-        # Fallback to contacts list for unknown modes
-        st.session_state.app_mode = "contacts_list"
-        st.rerun()
 
 
 # === UI PAGES ===
@@ -1036,16 +504,210 @@ def render_contacts_list_view():
     show_feedback_widget("contacts_list")
 
 
-# === MAIN EXECUTION ===
-if __name__ == "__main__":
-    # Configure page first
-    configure_page()
+def render_add_contact_view():
+    st.markdown("### ➕ Add New Contact")
     
-    # Initialize session state
-    init_session_state()
+    if st.button("← Back to Contacts", key="back_to_contacts", use_container_width=True):
+        st.session_state.app_mode = "contacts_list"
+        st.session_state.last_error_message = None
+        st.rerun()
     
-    # Render sidebar (only when authenticated)
-    render_sidebar()
+    st.markdown("**Tell us about this relationship so we can provide better guidance:**")
     
-    # Run main application
-    main_app()
+    with st.form("add_contact_form"):
+        name = st.text_input("Contact Name", placeholder="Sarah, Mom, Dad, Boss...", key="add_contact_name_input_widget")
+        context = st.selectbox(
+            "Relationship Type", 
+            list(CONTEXTS.keys()),
+            format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()} - {CONTEXTS[x]['description']}",
+            key="add_contact_context_select_widget"
+        )
+        
+        if st.form_submit_button("Add Contact", use_container_width=True):
+            if name.strip():
+                if save_contact(name.strip(), context):
+                    st.session_state.contacts = load_contacts_and_history()
+                    st.success(f"Added {name.strip()}! Ready to start healing conversations.")
+                    st.session_state.app_mode = "contacts_list"
+                    st.rerun()
+            else:
+                st.error("Contact name cannot be empty.")
+
+
+def render_edit_contact_view():
+    if not st.session_state.edit_contact:
+        st.session_state.app_mode = "contacts_list"
+        st.rerun()
+        return
+    
+    contact = st.session_state.edit_contact
+    st.markdown(f"### ✏️ Edit Contact: {contact['name']}")
+    
+    if st.button("← Back", key="back_to_conversation", use_container_width=True):
+        st.session_state.app_mode = "conversation_view"
+        st.session_state.edit_contact = None
+        st.rerun()
+    
+    with st.form("edit_contact_form"):
+        name_input = st.text_input("Name", value=contact["name"], key="edit_contact_name_input_widget")
+        
+        context_options = list(CONTEXTS.keys())
+        initial_context_index = context_options.index(contact["context"]) if contact["context"] in context_options else 0
+        context = st.selectbox(
+            "Relationship", 
+            context_options,
+            index=initial_context_index,
+            format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()}",
+            key="edit_contact_context_select"
+        )
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.form_submit_button("💾 Save Changes"):
+                new_name = name_input.strip()
+                if not new_name:
+                    st.error("Contact name cannot be empty.")
+                elif save_contact(new_name, context, contact["id"]):
+                    if st.session_state.active_contact == contact["name"]:
+                        st.session_state.active_contact = new_name
+                    st.success(f"Updated {new_name}")
+                    st.session_state.contacts = load_contacts_and_history()
+                    st.session_state.app_mode = "conversation_view"
+                    st.session_state.edit_contact = None
+                    st.rerun()
+        
+        with col2:
+            if st.form_submit_button("🗑️ Delete Contact"):
+                if delete_contact(contact["id"]):
+                    st.success(f"Deleted contact: {contact['name']}")
+                    st.session_state.contacts = load_contacts_and_history()
+                    st.session_state.app_mode = "contacts_list"
+                    st.session_state.active_contact = None
+                    st.session_state.edit_contact = None
+                    st.rerun()
+
+
+def render_conversation_view():
+    """The heart of our app - where healing happens"""
+    if not st.session_state.active_contact:
+        st.session_state.app_mode = "contacts_list"
+        st.rerun()
+        return
+    
+    contact_name = st.session_state.active_contact
+    contact_data = st.session_state.contacts.get(contact_name, {"context": "family", "history": [], "id": None})
+    context = contact_data["context"]
+    history = contact_data["history"]
+    contact_id = contact_data.get("id")
+    
+    st.markdown(f"### {CONTEXTS[context]['icon']} {contact_name} - {CONTEXTS[context]['description']}")
+    
+    # Navigation buttons
+    back_col, edit_col, _ = st.columns([2, 2, 6])
+    with back_col:
+        if st.button("← Back", key="back_btn", use_container_width=True):
+            st.session_state.app_mode = "contacts_list"
+            st.session_state.active_contact = None
+            st.session_state.last_error_message = None
+            st.session_state.clear_conversation_input = False
+            st.rerun()
+    
+    with edit_col:
+        if st.button("✏️ Edit", key="edit_current_contact", use_container_width=True):
+            st.session_state.edit_contact = {
+                "id": contact_id,
+                "name": contact_name,
+                "context": context
+            }
+            st.session_state.app_mode = "edit_contact_view"
+            st.rerun()
+    
+    # Relationship progress section
+    display_relationship_progress(contact_name, history)
+    
+    st.markdown("---")
+    
+    # Input section
+    st.markdown("#### 💭 Your Input")
+    st.markdown("*Share what happened - their message or your response that needs guidance*")
+    
+    input_value = "" if st.session_state.clear_conversation_input else st.session_state.get("conversation_input_text", "")
+    st.text_area(
+        "What's happening?",
+        value=input_value,
+        key="conversation_input_text",
+        placeholder="Examples:\n• They said: 'You never listen to me!'\n• I want to tell them: 'I'm frustrated with your attitude'\n• We had a fight about...",
+        height=120
+    )
+    
+    if st.session_state.clear_conversation_input:
+        st.session_state.clear_conversation_input = False
+    
+    # Action buttons
+    current_message = st.session_state.conversation_input_text
+    
+    col1, col2, col3 = st.columns([2, 2, 1])
+    with col1:
+        if st.button("✨ Transform with Love", key="transform_message", use_container_width=True):
+            process_message(contact_name, current_message, context)
+    
+    with col2:
+        # Interpret button
+        if current_message.strip():
+            render_interpret_section(contact_name, current_message, context, history)
+        else:
+            st.button("🔍 Interpret", disabled=True, help="Enter a message first", use_container_width=True)
+    
+    with col3:
+        if st.button("🗑️ Clear", key="clear_input_btn", use_container_width=True):
+            st.session_state.conversation_input_text = ""
+            st.session_state.clear_conversation_input = False
+            st.session_state.last_error_message = None
+            st.rerun()
+    
+    # Error display
+    if st.session_state.last_error_message:
+        st.error(st.session_state.last_error_message)
+    
+    # Show interpretation results if available
+    display_interpretation_result(contact_name)
+    
+    st.markdown("---")
+    
+    # AI Response section
+    st.markdown("#### 🤖 The Third Voice Guidance")
+    last_response_key = f"last_response_{contact_name}"
+    
+    if last_response_key in st.session_state and st.session_state[last_response_key]:
+        last_resp = st.session_state[last_response_key]
+        
+        # Show response if it's recent (within 5 minutes)
+        if datetime.now().timestamp() - last_resp["timestamp"] < 300:
+            with st.container():
+                st.markdown("**Your AI Guidance:**")
+                st.text_area(
+                    "AI Guidance Output",
+                    value=last_resp['response'],
+                    height=200,
+                    key="ai_response_display",
+                    help="Click inside and Ctrl+A to select all, then Ctrl+C to copy",
+                    disabled=False,
+                    label_visibility="hidden"
+                )
+                
+                col_score, col_model, col_copy = st.columns([2, 2, 1])
+                with col_score:
+                    if last_resp["healing_score"] >= 8:
+                        st.success(f"✨ Healing Score: {last_resp['healing_score']}/10 - Transformative guidance")
+                    elif last_resp["healing_score"] >= 6:
+                        st.info(f"💙 Healing Score: {last_resp['healing_score']}/10 - Good guidance")
+                    else:
+                        st.warning(f"⚠️ Healing Score: {last_resp['healing_score']}/10 - Basic guidance")
+                
+                with col_model:
+                    st.caption(f"Model: {last_resp['model']}")
+                
+                with col_copy:
+                    if st.button("📋 Copy", key="copy_response"):
+                        st.info("Click inside the text area above, Ctrl+A to select all, then Ctrl+C to copy")
