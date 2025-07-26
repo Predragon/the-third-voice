@@ -728,6 +728,17 @@ def render_ai_response_placeholder():
     - Build stronger relationships through understanding
     """)
 
-
 def render_conversation_history(history):
-    """Display conversation history"""
+    """Display conversation history with timestamps and scores"""
+    if not history:
+        st.info("No conversations yet. Start your first healing conversation!")
+        return
+    
+    st.markdown("#### 📜 Conversation History")
+    
+    for msg in reversed(history[-10:]):  # Show last 10 conversations
+        with st.expander(f"{msg['time']} - Healing Score: {msg.get('healing_score', 0)}/10", expanded=False):
+            st.markdown(f"**Your Input:** {msg['original']}")
+            if msg.get('result'):
+                st.markdown(f"**AI Guidance:** {msg['result']}")
+            st.caption(f"Model: {msg.get('model', 'Unknown')} | Type: {msg.get('type', 'coach')}")
