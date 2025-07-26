@@ -1,244 +1,218 @@
 """
-app.py - The Third Voice AI Main Application
-
-The main entry point for our family healing application.
-Built with love from detention, for every family seeking healing.
-
-"When both people are speaking from pain, someone must be the third voice."
+Authentication Debug & Fix - The Third Voice AI
+Run this to debug auth issues after modularization
 """
 
 import streamlit as st
-from datetime import datetime
 
-# Import our core modules
-from ui_components import (
-    render_app_header,
-    render_mission_sidebar,
-    render_login_form,
-    render_signup_form,
-    render_verification_notice,
-    render_first_time_setup,
-    render_contacts_list,
-    render_add_contact_form,
-    render_edit_contact_form,
-    render_conversation_header,
-    render_relationship_progress,
-    render_conversation_input,
-    render_interpretation_result,
-    render_ai_response_section,
-    render_conversation_history,
-    render_error_display,
-    render_feedback_widget
-)
-from data_backend import (
-    restore_user_session,
-    load_contacts_and_history
-)
+def debug_modular_auth():
+    """Debug authentication issues in the modular version"""
+    
+    st.title("🔧 Modular Auth Debug")
+    st.markdown("Let's fix the authentication after modularization...")
+    
+    # Test 1: Check if imports work
+    st.subheader("1. Testing Module Imports")
+    
+    try:
+        from data_backend import sign_in, sign_up, get_current_user_id, restore_user_session
+        st.success("✅ data_backend imports working")
+    except Exception as e:
+        st.error(f"❌ data_backend import failed: {e}")
+        st.code(str(e))
+        return
+    
+    try:
+        from ui_components import render_login_form
+        st.success("✅ ui_components imports working")
+    except Exception as e:
+        st.error(f"❌ ui_components import failed: {e}")
+        st.code(str(e))
+        return
+    
+    # Test 2: Check session state
+    st.subheader("2. Current Session State")
+    st.json({
+        "authenticated": st.session_state.get("authenticated", "NOT SET"),
+        "user": str(st.session_state.get("user", "NOT SET"))[:100],
+        "app_mode": st.session_state.get("app_mode", "NOT SET")
+    })
+    
+    # Test 3: Test the sign_in function directly
+    st.subheader("3. Test Sign-In Function")
+    
+    with st.form("direct_signin_test"):
+        email = st.text_input("Email")
+        password = st.text_input("Password", type="password")
+        test_signin = st.form_submit_button("Test Direct Sign-In")
+        
+        if test_signin and email and password:
+            st.write("Calling sign_in function...")
+            
+            # Show before state
+            st.write("BEFORE:")
+            st.json({
+                "authenticated": st.session_state.get("authenticated"),
+                "user": str(st.session_state.get("user"))[:50] if st.session_state.get("user") else None
+            })
+            
+            # Call the function
+            try:
+                result = sign_in(email, password)
+                st.write(f"sign_in returned: {result}")
+                
+                # Show after state
+                st.write("AFTER:")
+                st.json({
+                    "authenticated": st.session_state.get("authenticated"),
+                    "user": str(st.session_state.get("user"))[:50] if st.session_state.get("user") else None
+                })
+                
+                if result:
+                    st.success("✅ Sign-in function worked!")
+                    st.balloons()
+                else:
+                    st.error("❌ Sign-in function returned False")
+                    
+            except Exception as e:
+                st.error(f"❌ Sign-in function threw exception: {e}")
+                st.exception(e)
+    
+    # Test 4: Check Supabase connection
+    st.subheader("4. Direct Supabase Test")
+    
+    if st.button("Test Supabase Directly"):
+        try:
+            from data_backend import get_supabase
+            supabase = get_supabase()
+            
+            # Test with actual credentials if provided
+            if 'test_email' in st.session_state and 'test_password' in st.session_state:
+                email = st.session_state.test_email
+                password = st.session_state.test_password
+                
+                response = supabase.auth.sign_in_with_password({
+                    "email": email,
+                    "password": password
+                })
+                
+                if response.user:
+                    st.success(f"✅ Direct Supabase login works! User: {response.user.email}")
+                else:
+                    st.error("❌ Direct Supabase login failed")
+                    st.write(f"Response: {response}")
+            else:
+                st.info("Enter credentials above first, then try this test")
+                
+        except Exception as e:
+            st.error(f"❌ Direct Supabase test failed: {e}")
+            st.exception(e)
 
-# === APP CONFIGURATION ===
-st.set_page_config(
-    page_title="The Third Voice AI",
-    page_icon="🎙️",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+def show_fixed_login_form():
+    """Show a fixed version of the login form"""
+    
+    st.subheader("5. Fixed Login Form")
+    st.markdown("Try this corrected version:")
+    
+    with st.form("fixed_login_form"):
+        email = st.text_input("Email", key="fixed_email")
+        password = st.text_input("Password", type="password", key="fixed_password")
+        login_button = st.form_submit_button("Login (Fixed)")
+        
+        if login_button:
+            if not email or not password:
+                st.error("Please enter both email and password")
+            else:
+                # Store for other tests
+                st.session_state.test_email = email
+                st.session_state.test_password = password
+                
+                try:
+                    # Import here to avoid circular imports
+                    from data_backend import get_supabase
+                    
+                    supabase = get_supabase()
+                    
+                    with st.spinner("Logging in..."):
+                        response = supabase.auth.sign_in_with_password({
+                            "email": email,
+                            "password": password
+                        })
+                    
+                    # Check the response structure
+                    st.write("Raw response structure:")
+                    st.write(f"Has user: {hasattr(response, 'user')}")
+                    st.write(f"Has error: {hasattr(response, 'error')}")
+                    
+                    if hasattr(response, 'user') and response.user:
+                        # Update session state manually
+                        st.session_state.authenticated = True
+                        st.session_state.user = response.user
+                        st.session_state.app_mode = "contacts_list"
+                        
+                        st.success(f"✅ LOGIN SUCCESS! Welcome {response.user.email}")
+                        st.success("Session state updated - try refreshing the page")
+                        
+                    elif hasattr(response, 'error') and response.error:
+                        st.error(f"❌ Login failed: {response.error.message}")
+                        
+                        # Specific error help
+                        if "invalid_credentials" in response.error.message.lower():
+                            st.info("💡 This usually means wrong email/password or unverified email")
+                        elif "email_not_confirmed" in response.error.message.lower():
+                            st.info("💡 Check your email for verification link")
+                            
+                    else:
+                        st.error("❌ Unexpected response format")
+                        st.json(response.__dict__ if hasattr(response, '__dict__') else str(response))
+                        
+                except Exception as e:
+                    st.error(f"❌ Login exception: {e}")
+                    st.exception(e)
 
-# Custom CSS for better mobile experience
-st.markdown("""
-<style>
-    /* Hide Streamlit branding */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
+def show_working_app_structure():
+    """Show the corrected app structure"""
     
-    /* Mobile-friendly spacing */
-    .block-container {
-        padding-top: 1rem;
-        padding-bottom: 1rem;
-    }
+    st.subheader("6. App Structure Fix")
     
-    /* Better button styling */
-    .stButton > button {
-        width: 100%;
-        border-radius: 10px;
-        height: 3em;
-        margin: 0.25rem 0;
-    }
+    st.markdown("""
+    **The issue is likely in app.py session management. Here's the fix:**
     
-    /* Improved text areas */
-    .stTextArea > div > div > textarea {
-        border-radius: 10px;
-    }
+    In your `app.py`, make sure the main() function looks like this:
+    """)
     
-    /* Better expander styling */
-    .streamlit-expanderHeader {
-        font-weight: bold;
-    }
-    
-    /* Contact card styling */
-    .stButton > button[kind="secondary"] {
-        background-color: #f8f9fa;
-        border: 1px solid #dee2e6;
-        color: #495057;
-    }
-    
-    .stButton > button[kind="secondary"]:hover {
-        background-color: #e9ecef;
-        border-color: #adb5bd;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# === SESSION STATE INITIALIZATION ===
-def initialize_session_state():
-    """Initialize session state variables"""
-    if "authenticated" not in st.session_state:
-        st.session_state.authenticated = False
-        st.session_state.user = None
-        st.session_state.app_mode = "login"  # login, signup, verification_notice, contacts_list, conversation_view, add_contact_view, edit_contact_view
-    
-    if "contacts" not in st.session_state:
-        st.session_state.contacts = {}
-    
-    if "active_contact" not in st.session_state:
-        st.session_state.active_contact = None
-    
-    if "conversation_input_text" not in st.session_state:
-        st.session_state.conversation_input_text = ""
-    
-    if "clear_conversation_input" not in st.session_state:
-        st.session_state.clear_conversation_input = False
-    
-    if "last_error_message" not in st.session_state:
-        st.session_state.last_error_message = None
-    
-    if "edit_contact" not in st.session_state:
-        st.session_state.edit_contact = None
-    
-    if "show_verification_notice" not in st.session_state:
-        st.session_state.show_verification_notice = False
-    
-    if "verification_email" not in st.session_state:
-        st.session_state.verification_email = ""
-
-# === MAIN APPLICATION LOGIC ===
+    st.code("""
 def main():
-    """Main application logic"""
-    
-    # Initialize session state
+    # Initialize session state FIRST
     initialize_session_state()
     
-    # Try to restore user session on app reload
+    # Try to restore session BEFORE routing
     if not st.session_state.authenticated:
         if restore_user_session():
             st.session_state.app_mode = "contacts_list"
             st.rerun()
     
-    # Load user data if authenticated
+    # Load data if authenticated
     if st.session_state.authenticated and not st.session_state.contacts:
         st.session_state.contacts = load_contacts_and_history()
     
-    # Render sidebar (always visible when authenticated)
-    if st.session_state.authenticated:
-        render_mission_sidebar()
-    
-    # Main content routing
+    # Then do routing...
     if st.session_state.app_mode == "login":
         render_login_form()
+    # ... etc
+""", language="python")
     
-    elif st.session_state.app_mode == "signup":
-        render_signup_form()
-    
-    elif st.session_state.app_mode == "verification_notice":
-        render_verification_notice()
-    
-    elif st.session_state.authenticated:
-        
-        if st.session_state.app_mode == "contacts_list":
-            if not st.session_state.contacts:
-                render_first_time_setup()
-            else:
-                render_contacts_list()
-        
-        elif st.session_state.app_mode == "conversation_view":
-            render_conversation_view()
-        
-        elif st.session_state.app_mode == "add_contact_view":
-            render_add_contact_form()
-        
-        elif st.session_state.app_mode == "edit_contact_view":
-            render_edit_contact_form()
-        
-        else:
-            # Fallback to contacts list
-            st.session_state.app_mode = "contacts_list"
-            st.rerun()
-    
-    else:
-        # User not authenticated, redirect to login
-        st.session_state.app_mode = "login"
-        st.rerun()
+    st.markdown("""
+    **Key fixes:**
+    1. Session state initialization happens FIRST
+    2. Session restoration happens BEFORE routing
+    3. Data loading only happens when authenticated
+    """)
 
-def render_conversation_view():
-    """Render the main conversation interface"""
-    
-    if not st.session_state.active_contact:
-        st.session_state.app_mode = "contacts_list"
-        st.rerun()
-        return
-    
-    contact_name = st.session_state.active_contact
-    contact_data = st.session_state.contacts.get(contact_name)
-    
-    if not contact_data:
-        st.error(f"Contact '{contact_name}' not found.")
-        st.session_state.app_mode = "contacts_list"
-        st.session_state.active_contact = None
-        st.rerun()
-        return
-    
-    context = contact_data["context"]
-    contact_id = contact_data["id"]
-    history = contact_data["history"]
-    
-    # Render conversation interface
-    render_conversation_header(contact_name, context, contact_id)
-    
-    # Show any error messages
-    render_error_display()
-    
-    # Relationship progress (collapsible)
-    render_relationship_progress(contact_name, history)
-    
-    # Show interpretation results if available
-    render_interpretation_result(contact_name)
-    
-    # Main input interface
-    render_conversation_input(contact_name, context, history)
-    
-    # AI response section
-    render_ai_response_section(contact_name)
-    
-    # Conversation history
-    render_conversation_history(history)
-    
-    # Feedback widget
-    render_feedback_widget(f"conversation_{contact_name}")
-
-# === ERROR HANDLING ===
-def handle_uncaught_exception(e):
-    """Handle any uncaught exceptions gracefully"""
-    st.error("An unexpected error occurred. Please refresh the page or contact support.")
-    st.exception(e)
-    
-    # Reset to safe state
-    st.session_state.app_mode = "contacts_list" if st.session_state.authenticated else "login"
-    st.session_state.active_contact = None
-    st.session_state.last_error_message = None
-
-# === APPLICATION ENTRY POINT ===
+# Run the debug
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        handle_uncaught_exception(e)
+    debug_modular_auth()
+    st.markdown("---")
+    show_fixed_login_form()
+    st.markdown("---")  
+    show_working_app_structure()
