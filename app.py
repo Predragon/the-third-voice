@@ -374,7 +374,7 @@ def process_message(contact_name, message, context):
             cached = cache_response.data[0]
             ai_response_text = cached["response"]
             healing_score = cached["healing_score"]
-            ai_sentiment = cached["sentiment", "neutral")
+            ai_sentiment = cached["sentiment", "neutral"]
             ai_emotional_state = cached["emotional_state"]
             st.info("Using cached response for speed.")
         else:
