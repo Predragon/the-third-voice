@@ -216,7 +216,14 @@ def get_healing_insights(history):
     scores = [msg.get('healing_score', 0) for msg in history if msg.get('healing_score')]
     if len(scores) >= 5:
         recent_avg = sum(scores[-5:]) / 5
-        older_avg = sum(scores[-10:-5]) / 5 if len(scores) >= 10 else sum(scores[:-5]) / len(scores[:-5])
+        
+        # Fix the division by zero error
+        if len(scores) >= 10:
+            older_avg = sum(scores[-10:-5]) / 5
+        else:
+            # For scores between 5-9, compare with earlier available scores
+            older_scores = scores[:-5]
+            older_avg = sum(older_scores) / len(older_scores) if older_scores else recent_avg
         
         if recent_avg > older_avg + 0.5:
             insights.append("📈 Your communication is improving! Recent conversations show higher healing scores.")
