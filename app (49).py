@@ -742,3 +742,81 @@ def render_conversation_history(history):
             if msg.get('result'):
                 st.markdown(f"**AI Guidance:** {msg['result']}")
             st.caption(f"Model: {msg.get('model', 'Unknown')} | Type: {msg.get('type', 'coach')}")
+
+
+# Add these functions to the end of your ui_components.py file
+
+def process_conversation_message(contact_name, message, context, history):
+    """Process a conversation message with AI transformation"""
+    st.session_state.last_error_message = None
+    
+    if not message.strip():
+        st.session_state.last_error_message = "Input message cannot be empty. Please type something to transform."
+        return
+    
+    # Get contact info
+    contact_data = st.session_state.contacts.get(contact_name)
+    if not contact_data:
+        st.session_state.last_error_message = "Contact not found."
+        return
+    
+    contact_id = contact_data["id"]
+    
+    try:
+        with st.spinner("🤖 Processing with relationship insights..."):
+            result = process_ai_transformation(contact_name, message, context, history)
+            
+            if result.get("success"):
+                # Save the incoming message
+                save_message(contact_id, contact_name, "incoming", message, None, "unknown", 0, "N/A")
+                
+                # Save the AI response
+                save_message(
+                    contact_id, 
+                    contact_name, 
+                    result.get("mode", "coach"), 
+                    message, 
+                    result["response"], 
+                    result.get("emotional_state", "calm"), 
+                    result["healing_score"], 
+                    result["model"], 
+                    result.get("sentiment", "neutral")
+                )
+                
+                # Store response for immediate display
+                st.session_state[f"last_response_{contact_name}"] = {
+                    "response": result["response"],
+                    "healing_score": result["healing_score"],
+                    "timestamp": datetime.now().timestamp(),
+                    "model": result["model"]
+                }
+                
+                st.session_state.clear_conversation_input = True
+                st.rerun()
+            else:
+                st.session_state.last_error_message = result.get("error", "Processing failed")
+                
+    except Exception as e:
+        st.session_state.last_error_message = f"An unexpected error occurred: {e}"
+
+
+def render_error_display():
+    """Display error messages if any exist"""
+    if st.session_state.get('last_error_message'):
+        st.error(st.session_state.last_error_message)
+
+
+def clear_conversation_state(contact_name):
+    """Clear conversation-related session state for a contact"""
+    keys_to_clear = [
+        f"last_response_{contact_name}",
+        f"last_interpretation_{contact_name}",
+        "conversation_input_text",
+        "last_error_message"
+    ]
+    
+    for key in keys_to_clear:
+        if key in st.session_state:
+            del st.session_state[key]
+    
+    st.session_state.clear_conversation_input = False
