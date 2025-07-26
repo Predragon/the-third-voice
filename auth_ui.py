@@ -6,7 +6,8 @@
 import streamlit as st
 from datetime import datetime
 #from auth_backend import CONTEXTS, sign_up, sign_in, sign_out
-from auth_backend import CONTEXTS
+#from auth_backend import CONTEXTS
+from app_state import CONTEXTS
 from core_auth import sign_up, sign_in, sign_out
 from database import supabase, load_contacts_and_history, save_contact, delete_contact, save_feedback
 
