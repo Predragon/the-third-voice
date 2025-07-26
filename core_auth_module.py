@@ -5,6 +5,7 @@ import os
 import json
 import hashlib
 from datetime import datetime, timezone
+import logging
 
 # --- Constants ---
 CONTEXTS = {
@@ -17,7 +18,11 @@ CONTEXTS = {
 
 # AI Model Configuration
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL = "google/gemma-2-9b-it:free"
+DEFAULT_MODEL = "google/gemma-2-9b-it:free"  # Hardcoded fallback model
+
+# --- Logging Setup ---
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # --- Supabase Initialization ---
 @st.cache_resource
@@ -52,7 +57,9 @@ def init_session_state():
         'add_contact_context_select': list(CONTEXTS.keys())[0],
         'last_error_message': None,
         'show_verification_notice': False,
-        'verification_email': None
+        'verification_email': None,
+        'current_model_index': 0,  # Track current model
+        'last_successful_model': None  # Track last successful model
     }
     
     for key, value in defaults.items():
@@ -60,6 +67,91 @@ def init_session_state():
             st.session_state[key] = value
 
 init_session_state()
+
+# --- Model Management Functions ---
+def get_available_models():
+    """Returns ordered list of models from secrets (model1 first)"""
+    models = []
+    try:
+        for i in range(1, 100):  # Support model1 to model99
+            model_key = f"model{i}"
+            if hasattr(st.secrets, "models") and model_key in st.secrets.models:
+                models.append(st.secrets.models[model_key])
+            else:
+                break
+    except Exception as e:
+        logger.error(f"Error reading models from secrets: {e}")
+    
+    # Always append default model as last resort
+    if not models:
+        models.append(DEFAULT_MODEL)
+    return models
+
+def get_current_model():
+    """Returns the currently working model"""
+    models = get_available_models()
+    index = st.session_state.current_model_index
+    return models[index] if index < len(models) else DEFAULT_MODEL
+
+def try_next_model():
+    """Cycle to next available model, return True if more models available"""
+    models = get_available_models()
+    st.session_state.current_model_index += 1
+    if st.session_state.current_model_index < len(models):
+        new_model = models[st.session_state.current_model_index]
+        logger.info(f"Switching to next model: {new_model}")
+        return True
+    else:
+        logger.warning("No more models to try, using default model")
+        st.session_state.current_model_index = len(models) - 1  # Stay on last model
+        return False
+
+def reset_to_primary_model():
+    """Reset back to model1 after successful request"""
+    if st.session_state.current_model_index != 0:
+        logger.info("Resetting to primary model")
+        st.session_state.current_model_index = 0
+
+def get_model_display_name(model_id):
+    """Return model name for logging/debugging"""
+    return model_id.split("/")[-1].split(":")[0]  # Extract model name without provider or tier
+
+def make_robust_ai_request(headers, payload, timeout=25):
+    """Make AI request with automatic model fallback"""
+    models = get_available_models()
+    original_model_index = st.session_state.current_model_index
+    error_messages = []
+    
+    while True:
+        current_model = get_current_model()
+        payload["model"] = current_model
+        
+        try:
+            logger.info(f"Attempting request with model: {get_model_display_name(current_model)}")
+            response = requests.post(API_URL, headers=headers, json=payload, timeout=timeout)
+            response.raise_for_status()  # Raise exception for non-200 status codes
+            
+            # Success - store model used and reset to primary
+            st.session_state.last_successful_model = current_model
+            reset_to_primary_model()
+            logger.info(f"Request successful with model: {get_model_display_name(current_model)}")
+            return response
+            
+        except (requests.exceptions.Timeout, 
+                requests.exceptions.ConnectionError,
+                requests.exceptions.HTTPError,
+                requests.exceptions.RequestException) as e:
+            error_messages.append(f"Model {get_model_display_name(current_model)} failed: {str(e)}")
+            logger.error(f"Request failed with {get_model_display_name(current_model)}: {str(e)}")
+            
+            # Try next model
+            if not try_next_model():
+                # All models exhausted
+                logger.error("All models failed: " + "; ".join(error_messages))
+                raise Exception("All AI models failed: " + "; ".join(error_messages))
+    
+    # Should never reach here due to while loop
+    raise Exception("Unexpected error in model fallback logic")
 
 # --- Helper Functions ---
 def get_current_user_id():
