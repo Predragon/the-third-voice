@@ -5,11 +5,8 @@
 
 import streamlit as st
 from datetime import datetime
-from auth_backend import (
-    CONTEXTS, supabase, sign_up, sign_in, sign_out,
-    load_contacts_and_history, save_contact, delete_contact,
-    save_feedback
-)
+from auth_backend import CONTEXTS, sign_up, sign_in, sign_out
+from database import supabase, load_contacts_and_history, save_contact, delete_contact, save_feedback
 
 # --- Feedback Widget Function ---
 def show_feedback_widget(context="general"):
