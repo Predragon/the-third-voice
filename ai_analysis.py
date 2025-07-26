@@ -6,12 +6,10 @@
 import streamlit as st
 import requests
 from datetime import datetime, timezone
-# CORRECT imports in ai_analysis.py (after my fix):
 from ai_engine import make_robust_ai_request
-#from auth_backend import get_current_user_id, supabase
-from database import get_current_user_id, supabase
-from ai_engine import make_robust_ai_request
-from auth_backend import get_current_user_id, supabase
+from database import supabase
+from core_auth import get_current_user_id
+
 # --- PHASE 2: INTERPRETATION & RELATIONSHIP MEMORY FUNCTIONS ---
 
 def interpret_message(contact_name, message, context, relationship_history=None):
@@ -290,7 +288,7 @@ def process_message(contact_name, message, context):
     Where angry words become loving understanding.
     Every processed message is a family saved.
     """
-    from auth_backend import create_message_hash, save_message
+    from database import create_message_hash, save_message
     
     st.session_state.last_error_message = None
     
