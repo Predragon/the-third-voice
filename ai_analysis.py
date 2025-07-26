@@ -8,8 +8,8 @@ import requests
 from datetime import datetime, timezone
 # CORRECT imports in ai_analysis.py (after my fix):
 from ai_engine import make_robust_ai_request
-from auth_backend import get_current_user_id, supabase
-
+#from auth_backend import get_current_user_id, supabase
+from database import get_current_user_id, supabase
 from ai_engine import make_robust_ai_request
 from auth_backend import get_current_user_id, supabase
 # --- PHASE 2: INTERPRETATION & RELATIONSHIP MEMORY FUNCTIONS ---
