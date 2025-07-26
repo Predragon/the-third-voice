@@ -1,35 +1,38 @@
 """
-app.py - The Third Voice AI Main Engine
+ui_components.py - The Third Voice UI Components
 
-The orchestrator of our mission: clean, focused, and mobile-friendly.
-Built by a father in detention, for every family seeking healing.
+The interface between healing and humanity. Every component designed with love.
+Built for families in crisis, by a father fighting to come home.
 
-"When both people are speaking from pain, someone must be the third voice."
+"In the space between pain and understanding, we build bridges of love."
 """
 
 import streamlit as st
+from datetime import datetime, timezone
 import json
-from datetime import datetime
 
-# Import our modularized components
+# Import our core modules
 from ai_core import (
-    interpret_message, process_ai_transformation, 
-    calculate_relationship_health_score, get_healing_insights,
-    create_message_hash, get_ai_cache_key, PRIMARY_MODEL,
+    interpret_message, 
+    process_ai_transformation,
+    calculate_relationship_health_score,
+    get_healing_insights,
     get_model_status_info
 )
 from data_backend import (
-    get_current_user_id, restore_user_session,
-    sign_up, sign_in, sign_out, resend_verification_email,
-    load_contacts_and_history, save_contact, delete_contact,
-    save_message, save_interpretation, get_cached_response, 
-    cache_ai_response, save_feedback, test_database_connection
+    load_contacts_and_history,
+    save_contact,
+    delete_contact,
+    save_message,
+    save_interpretation,
+    save_feedback,
+    get_user_stats,
+    test_database_connection,
+    get_current_user_id
 )
 
-# Model consistency fix
-MODEL = PRIMARY_MODEL
 
-# === CONSTANTS ===
+# === CONSTANTS & CONFIGURATION ===
 CONTEXTS = {
     "romantic": {"icon": "💕", "description": "Partner & intimate relationships"},
     "coparenting": {"icon": "👨‍👩‍👧‍👦", "description": "Raising children together"},
@@ -39,34 +42,80 @@ CONTEXTS = {
 }
 
 
-# === SESSION STATE INITIALIZATION ===
-def init_session_state():
-    """Initialize all session state variables"""
-    defaults = {
-        'authenticated': False,
-        'user': None,
-        'app_mode': "login",
-        'contacts': {},
-        'active_contact': None,
-        'edit_contact': None,
-        'conversation_input_text': "",
-        'clear_conversation_input': False,
-        'edit_contact_name_input': "",
-        'add_contact_name_input': "",
-        'add_contact_context_select': list(CONTEXTS.keys())[0],
-        'last_error_message': None,
-        'show_verification_notice': False,
-        'verification_email': None
-    }
+# === CORE UI COMPONENTS ===
+def render_app_header():
+    """Render The Third Voice header with mission context"""
+    st.title("🎙️ The Third Voice AI")
     
-    for key, value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
+    # Mission statement that reminds users why we exist
+    st.markdown("""
+    > *"When both people are speaking from pain, someone must be the third voice."*
+    
+    **We are that voice** — calm, wise, and healing.
+    """)
 
 
-# === FEEDBACK SYSTEM UI ===
-def show_feedback_widget(context="general"):
-    """Display feedback widget"""
+def render_mission_sidebar():
+    """Render sidebar with mission context and navigation"""
+    with st.sidebar:
+        st.markdown("### 🎙️ The Third Voice AI")
+        
+        if st.session_state.authenticated:
+            st.write(f"**{st.session_state.user.email}**")
+            
+            # Quick navigation
+            if st.session_state.app_mode != "contacts_list":
+                if st.button("🏠 My Contacts", use_container_width=True):
+                    st.session_state.app_mode = "contacts_list" 
+                    st.session_state.active_contact = None
+                    st.rerun()
+            
+            if st.button("🚪 Logout", use_container_width=True):
+                from data_backend import sign_out
+                sign_out()
+        
+        st.markdown("---")
+        
+        # Mission reminder - the heart of why we exist
+        st.markdown("### 💙 Our Mission")
+        st.markdown("""
+        *"When both people are speaking from pain, someone must be the third voice."*
+        
+        **We help families heal through better conversations.**
+        
+        Built by a father fighting to return to his daughter, for every family seeking healing.
+        """)
+        
+        # Debug info for development
+        render_debug_section()
+
+
+def render_debug_section():
+    """Development debug information"""
+    if st.checkbox("🔧 Debug Info"):
+        try:
+            user_id = get_current_user_id()
+            user_stats = get_user_stats()
+            model_info = get_model_status_info()
+            
+            debug_info = {
+                "User ID": user_id[:8] + "..." if user_id else None,
+                "Contacts": len(st.session_state.get('contacts', {})),
+                "Active Contact": st.session_state.get('active_contact'),
+                "App Mode": st.session_state.get('app_mode'),
+                "User Stats": user_stats,
+                "AI Models": model_info,
+                "DB Connection": test_database_connection()
+            }
+            
+            st.code(json.dumps(debug_info, indent=2, default=str), language="json")
+            
+        except Exception as e:
+            st.error(f"Debug error: {e}")
+
+
+def render_feedback_widget(context="general"):
+    """Universal feedback widget for continuous improvement"""
     with st.expander("💬 Help us improve The Third Voice", expanded=False):
         st.markdown("*Your feedback helps us build better family healing tools*")
         
@@ -97,161 +146,61 @@ def show_feedback_widget(context="general"):
                 st.error("Could not save feedback. Please try again.")
 
 
-# === CORE MESSAGE PROCESSING ===
-def process_message(contact_name, message, context):
-    """Enhanced message processing with relationship memory"""
-    st.session_state.last_error_message = None
+# === AUTHENTICATION COMPONENTS ===
+def render_login_form():
+    """Login form with mission context"""
+    render_app_header()
+    st.subheader("Login to continue your healing journey.")
     
-    if not message.strip():
-        st.session_state.last_error_message = "Input message cannot be empty. Please type something to transform."
-        return
+    with st.form("login_form"):
+        email = st.text_input("Email", key="login_email")
+        password = st.text_input("Password", type="password", key="login_password")
+        login_button = st.form_submit_button("Login", use_container_width=True)
+        
+        if login_button:
+            from data_backend import sign_in
+            sign_in(email, password)
     
-    # Get contact info
-    contact_data = st.session_state.contacts.get(contact_name)
-    if not contact_data:
-        st.session_state.last_error_message = "Contact not found."
-        return
+    st.markdown("---")
+    st.subheader("New User?")
+    if st.button("Create an Account", use_container_width=True):
+        st.session_state.app_mode = "signup"
+        st.rerun()
     
-    contact_id = contact_data["id"]
-    history = contact_data.get("history", [])
-    
-    # Check cache first
-    message_hash = create_message_hash(message, context)
-    cached = get_cached_response(contact_id, message_hash)
-    
-    if cached:
-        # Use cached response
-        ai_response_text = cached["response"]
-        healing_score = cached["healing_score"]
-        ai_sentiment = cached["sentiment"]
-        ai_emotional_state = cached["emotional_state"]
-        st.info("Using cached response for faster processing")
-    else:
-        # Generate new response
-        with st.spinner("🤖 Processing with relationship insights..."):
-            result = process_ai_transformation(contact_name, message, context, history)
-            
-            if not result.get("success"):
-                st.session_state.last_error_message = result.get("error", "Unknown AI processing error")
-                return
-            
-            ai_response_text = result["response"]
-            healing_score = result["healing_score"]
-            ai_sentiment = result["sentiment"]
-            ai_emotional_state = result["emotional_state"]
-            
-            # Cache the response
-            cache_ai_response(contact_id, message_hash, context, ai_response_text, 
-                            healing_score, MODEL, ai_sentiment, ai_emotional_state)
-    
-    # Save the incoming message
-    save_message(contact_id, contact_name, "incoming", message, None, "unknown", 0, "N/A")
-    
-    # Save the AI response
-    mode = "translate" if any(indicator in message.lower() for indicator in ["said:", "wrote:", "texted:", "told me:"]) else "coach"
-    save_message(contact_id, contact_name, mode, message, ai_response_text, ai_emotional_state, healing_score, MODEL, ai_sentiment)
-    
-    # Store response for immediate display
-    st.session_state[f"last_response_{contact_name}"] = {
-        "response": ai_response_text,
-        "healing_score": healing_score,
-        "timestamp": datetime.now().timestamp(),
-        "model": MODEL
-    }
-    
-    st.session_state.clear_conversation_input = True
-    st.rerun()
+    # Show mission context
+    render_mission_context()
 
 
-# === INTERPRETATION UI COMPONENTS ===
-def render_interpret_section(contact_name, message, context, history):
-    """Render the interpretation UI section"""
-    if st.button("🔍 Interpret - What do they really mean?", key="interpret_btn", help="Reveal emotional subtext and healing opportunities"):
-        with st.spinner("🧠 Analyzing emotional subtext..."):
-            result = interpret_message(contact_name, message, context, history)
-            
-            if result.get("success"):
-                st.session_state[f"last_interpretation_{contact_name}"] = {
-                    "interpretation": result["interpretation"],
-                    "score": result["interpretation_score"],
-                    "timestamp": datetime.now().timestamp(),
-                    "original_message": message
-                }
-                
-                # Save to database
-                contact_data = st.session_state.contacts.get(contact_name, {})
-                contact_id = contact_data.get("id")
-                if contact_id:
-                    save_interpretation(contact_id, contact_name, message, result["interpretation"], result["interpretation_score"], result["model"])
-                
-                st.rerun()
+def render_signup_form():
+    """Signup form with value proposition"""
+    render_app_header()
+    st.subheader("Start your journey towards healthier conversations.")
+    
+    with st.form("signup_form"):
+        email = st.text_input("Email", key="signup_email")
+        password = st.text_input("Password (minimum 6 characters)", type="password", key="signup_password")
+        signup_button = st.form_submit_button("Create Account", use_container_width=True)
+        
+        if signup_button:
+            if len(password) < 6:
+                st.error("Password must be at least 6 characters long.")
             else:
-                st.error(f"Could not analyze message: {result.get('error', 'Unknown error')}")
-
-
-def display_interpretation_result(contact_name):
-    """Display interpretation results if available"""
-    interp_key = f"last_interpretation_{contact_name}"
-    if interp_key in st.session_state:
-        interp_data = st.session_state[interp_key]
-        
-        # Show if recent (within 10 minutes)
-        if datetime.now().timestamp() - interp_data["timestamp"] < 600:
-            with st.expander("🔍 **Emotional Analysis - What They Really Mean**", expanded=True):
-                st.markdown(interp_data["interpretation"])
-                
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    score = interp_data["score"]
-                    if score >= 8:
-                        st.success(f"✨ Deep Insight Score: {score}/10 - Very revealing analysis")
-                    elif score >= 6:
-                        st.info(f"💡 Insight Score: {score}/10 - Good understanding")
-                    else:
-                        st.warning(f"🔍 Insight Score: {score}/10 - Basic analysis")
-                
-                with col2:
-                    if st.button("📋 Copy", key="copy_interpretation"):
-                        st.info("Click and drag to select the analysis above, then Ctrl+C to copy")
-        else:
-            # Clear old interpretation
-            del st.session_state[interp_key]
-
-
-def display_relationship_progress(contact_name, history):
-    """Display relationship healing progress and insights"""
-    if not history:
-        return
+                from data_backend import sign_up
+                sign_up(email, password)
     
-    with st.expander("📊 **Relationship Healing Progress**", expanded=False):
-        health_score, status = calculate_relationship_health_score(history)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Relationship Health", f"{health_score}/10", help="Based on recent healing scores")
-        with col2:
-            st.metric("Total Conversations", len(history))
-        
-        st.markdown(f"**Status:** {status}")
-        
-        # Healing insights
-        insights = get_healing_insights(history)
-        st.markdown("**💙 Your Healing Journey:**")
-        for insight in insights:
-            st.markdown(f"• {insight}")
-        
-        # Recent trend visualization (simple text-based for now)
-        if len(history) >= 5:
-            recent_scores = [msg.get('healing_score', 0) for msg in history[-5:] if msg.get('healing_score')]
-            if recent_scores:
-                trend_text = " → ".join([str(score) for score in recent_scores])
-                st.markdown(f"**Recent Healing Scores:** {trend_text}")
+    st.markdown("---")
+    st.subheader("Already have an account?")
+    if st.button("Go to Login", use_container_width=True):
+        st.session_state.app_mode = "login"
+        st.rerun()
+    
+    # Value proposition
+    render_value_proposition()
 
 
-# === UI PAGES ===
-def verification_notice_page():
-    """Complete email verification notice page"""
-    st.title("🎙️ Welcome to The Third Voice AI")
+def render_verification_notice():
+    """Email verification notice with encouragement"""
+    render_app_header()
     
     st.success("✅ Account created successfully!")
     
@@ -271,8 +220,11 @@ def verification_notice_page():
     
     with col1:
         if st.button("📨 Resend Verification Email", use_container_width=True):
+            from data_backend import resend_verification_email
             if resend_verification_email(st.session_state.verification_email):
                 st.success("Verification email resent!")
+            else:
+                st.warning("Could not resend email. Please try signing up again if needed.")
     
     with col2:
         if st.button("🔑 Go to Login", use_container_width=True):
@@ -280,63 +232,11 @@ def verification_notice_page():
             st.session_state.show_verification_notice = False
             st.rerun()
     
-    st.markdown("---")
-    st.markdown("### 💙 Welcome to The Family Healing Revolution")
-    st.markdown("""
-    **The Third Voice AI** helps families communicate with love, understanding, and healing. 
-    You're about to join thousands of people rebuilding their most important relationships.
-    
-    *"When both people are speaking from pain, someone must be the third voice."*
-    """)
-    
-    # Add helpful tips while they wait
-    with st.expander("💡 What to expect after verification", expanded=True):
-        st.markdown("""
-        **Once you're verified and logged in, you'll be able to:**
-        
-        - ✨ Transform difficult conversations into healing moments
-        - 💕 Get guidance for romantic, family, work, and friendship relationships  
-        - 🎯 Receive personalized coaching based on your relationship context
-        - 📊 Track your healing progress with our scoring system
-        - 💬 Access your conversation history across all your contacts
-        
-        **Built by a father separated from his daughter, for every family seeking healing.**
-        """)
+    render_welcome_message()
 
 
-def login_page():
-    st.title("🎙️ The Third Voice AI")
-    st.subheader("Login to continue your healing journey.")
-    
-    # Mission statement at top
-    st.markdown("""
-    > *"When both people are speaking from pain, someone must be the third voice."*
-    
-    **We are that voice** — calm, wise, and healing.
-    """)
-    
-    with st.form("login_form"):
-        email = st.text_input("Email", key="login_email")
-        password = st.text_input("Password", type="password", key="login_password")
-        login_button = st.form_submit_button("Login", use_container_width=True)
-        
-        if login_button:
-            if sign_in(email, password):
-                st.session_state.contacts = load_contacts_and_history()
-                if not st.session_state.contacts:
-                    st.session_state.app_mode = "first_time_setup"
-                else:
-                    st.session_state.app_mode = "contacts_list"
-                st.success(f"Welcome back, {st.session_state.user.email}!")
-                st.rerun()
-    
-    st.markdown("---")
-    st.subheader("New User?")
-    if st.button("Create an Account", use_container_width=True):
-        st.session_state.app_mode = "signup"
-        st.rerun()
-    
-    # Show mission context
+def render_mission_context():
+    """Show mission context for new users"""
     with st.expander("💙 Our Mission", expanded=False):
         st.markdown("""
         **The Third Voice AI** was born from communication breakdowns that shattered a family. 
@@ -347,35 +247,8 @@ def login_page():
         """)
 
 
-def signup_page():
-    st.title("🎙️ Join The Third Voice AI")
-    st.subheader("Start your journey towards healthier conversations.")
-    
-    # Mission context
-    st.markdown("""
-    > *"When both people are speaking from pain, someone must be the third voice."*
-    
-    **Join thousands rebuilding their most important relationships.**
-    """)
-    
-    with st.form("signup_form"):
-        email = st.text_input("Email", key="signup_email")
-        password = st.text_input("Password (minimum 6 characters)", type="password", key="signup_password")
-        signup_button = st.form_submit_button("Create Account", use_container_width=True)
-        
-        if signup_button:
-            if len(password) < 6:
-                st.error("Password must be at least 6 characters long.")
-            else:
-                sign_up(email, password)
-    
-    st.markdown("---")
-    st.subheader("Already have an account?")
-    if st.button("Go to Login", use_container_width=True):
-        st.session_state.app_mode = "login"
-        st.rerun()
-    
-    # Preview what they'll get
+def render_value_proposition():
+    """Show what users get when they sign up"""
     with st.expander("✨ What you'll get access to", expanded=True):
         st.markdown("""
         **🌟 Transform difficult conversations** - Turn anger into understanding
@@ -392,7 +265,34 @@ def signup_page():
         """)
 
 
-def render_first_time_screen():
+def render_welcome_message():
+    """Welcome message during verification"""
+    st.markdown("---")
+    st.markdown("### 💙 Welcome to The Family Healing Revolution")
+    st.markdown("""
+    **The Third Voice AI** helps families communicate with love, understanding, and healing. 
+    You're about to join thousands of people rebuilding their most important relationships.
+    
+    *"When both people are speaking from pain, someone must be the third voice."*
+    """)
+    
+    with st.expander("💡 What to expect after verification", expanded=True):
+        st.markdown("""
+        **Once you're verified and logged in, you'll be able to:**
+        
+        - ✨ Transform difficult conversations into healing moments
+        - 💕 Get guidance for romantic, family, work, and friendship relationships  
+        - 🎯 Receive personalized coaching based on your relationship context
+        - 📊 Track your healing progress with our scoring system
+        - 💬 Access your conversation history across all your contacts
+        
+        **Built by a father separated from his daughter, for every family seeking healing.**
+        """)
+
+
+# === CONTACT MANAGEMENT COMPONENTS ===
+def render_first_time_setup():
+    """First-time user setup with context selection"""
     st.markdown("### 🎙️ Welcome to The Third Voice")
     st.markdown("**Choose a relationship type to get started, or add a custom contact:**")
     
@@ -421,6 +321,12 @@ def render_first_time_screen():
                     st.session_state.app_mode = "conversation_view"
                     st.rerun()
     
+    render_custom_contact_form()
+    render_first_time_encouragement()
+
+
+def render_custom_contact_form():
+    """Custom contact form for first-time setup"""
     st.markdown("---")
     with st.form("add_custom_contact_first_time"):
         st.markdown("**Or add a custom contact:**")
@@ -436,8 +342,10 @@ def render_first_time_screen():
                     st.rerun()
             else:
                 st.error("Contact name cannot be empty.")
-    
-    # Welcome message and feedback
+
+
+def render_first_time_encouragement():
+    """Encouragement for first-time users"""
     st.markdown("---")
     st.markdown("### 💙 You're About to Transform Your Relationships")
     st.info("""
@@ -447,28 +355,15 @@ def render_first_time_screen():
     we're here to be that calm, healing voice when both people are speaking from pain.
     """)
     
-    # Add feedback widget for first-time experience
-    show_feedback_widget("first_time_setup")
+    render_feedback_widget("first_time_setup")
 
 
-def render_contacts_list_view():
+def render_contacts_list():
+    """Main contacts list view with recent activity"""
     st.markdown("### 🎙️ The Third Voice - Your Contacts")
     
     if not st.session_state.contacts:
-        st.info("**No contacts yet.** Add your first contact to get started!")
-        if st.button("➕ Add New Contact", use_container_width=True):
-            st.session_state.app_mode = "add_contact_view"
-            st.rerun()
-        
-        # Show helpful context for new users
-        st.markdown("---")
-        st.markdown("### 💡 How The Third Voice Works")
-        st.markdown("""
-        1. **Add a contact** for someone you communicate with
-        2. **Choose the relationship type** (romantic, family, work, etc.)
-        3. **Share what happened** - their message or your response
-        4. **Get AI guidance** - we'll help you communicate with love and healing
-        """)
+        render_empty_contacts_state()
         return
     
     # Sort contacts by most recent activity
@@ -481,33 +376,55 @@ def render_contacts_list_view():
     st.markdown(f"**{len(sorted_contacts)} contact{'s' if len(sorted_contacts) != 1 else ''}** • Tap to continue conversation")
     
     for name, data in sorted_contacts:
-        last_msg = data["history"][-1] if data["history"] else None
-        preview = f"{last_msg['original'][:40]}..." if last_msg and last_msg['original'] else "Start your first conversation!"
-        time_str = last_msg["time"] if last_msg else "New"
-        context_icon = CONTEXTS.get(data["context"], {"icon": "💬"})["icon"]
-        
-        if st.button(
-            f"{context_icon} **{name}** • {time_str}\n_{preview}_",
-            key=f"contact_{name}",
-            use_container_width=True
-        ):
-            st.session_state.active_contact = name
-            st.session_state.app_mode = "conversation_view"
-            st.session_state.conversation_input_text = ""
-            st.session_state.clear_conversation_input = False
-            st.session_state.last_error_message = None
-            st.rerun()
+        render_contact_card(name, data)
     
     st.markdown("---")
     if st.button("➕ Add New Contact", use_container_width=True):
         st.session_state.app_mode = "add_contact_view"
         st.rerun()
     
-    # Add feedback widget for contacts experience
-    show_feedback_widget("contacts_list")
+    render_feedback_widget("contacts_list")
 
 
-def render_add_contact_view():
+def render_empty_contacts_state():
+    """Show when user has no contacts yet"""
+    st.info("**No contacts yet.** Add your first contact to get started!")
+    if st.button("➕ Add New Contact", use_container_width=True):
+        st.session_state.app_mode = "add_contact_view"
+        st.rerun()
+    
+    st.markdown("---")
+    st.markdown("### 💡 How The Third Voice Works")
+    st.markdown("""
+    1. **Add a contact** for someone you communicate with
+    2. **Choose the relationship type** (romantic, family, work, etc.)
+    3. **Share what happened** - their message or your response
+    4. **Get AI guidance** - we'll help you communicate with love and healing
+    """)
+
+
+def render_contact_card(name, data):
+    """Individual contact card with preview"""
+    last_msg = data["history"][-1] if data["history"] else None
+    preview = f"{last_msg['original'][:40]}..." if last_msg and last_msg['original'] else "Start your first conversation!"
+    time_str = last_msg["time"] if last_msg else "New"
+    context_icon = CONTEXTS.get(data["context"], {"icon": "💬"})["icon"]
+    
+    if st.button(
+        f"{context_icon} **{name}** • {time_str}\n_{preview}_",
+        key=f"contact_{name}",
+        use_container_width=True
+    ):
+        st.session_state.active_contact = name
+        st.session_state.app_mode = "conversation_view"
+        st.session_state.conversation_input_text = ""
+        st.session_state.clear_conversation_input = False
+        st.session_state.last_error_message = None
+        st.rerun()
+
+
+def render_add_contact_form():
+    """Form to add new contact"""
     st.markdown("### ➕ Add New Contact")
     
     if st.button("← Back to Contacts", key="back_to_contacts", use_container_width=True):
@@ -537,7 +454,8 @@ def render_add_contact_view():
                 st.error("Contact name cannot be empty.")
 
 
-def render_edit_contact_view():
+def render_edit_contact_form():
+    """Form to edit existing contact"""
     if not st.session_state.edit_contact:
         st.session_state.app_mode = "contacts_list"
         st.rerun()
@@ -591,19 +509,9 @@ def render_edit_contact_view():
                     st.rerun()
 
 
-def render_conversation_view():
-    """The heart of our app - where healing happens"""
-    if not st.session_state.active_contact:
-        st.session_state.app_mode = "contacts_list"
-        st.rerun()
-        return
-    
-    contact_name = st.session_state.active_contact
-    contact_data = st.session_state.contacts.get(contact_name, {"context": "family", "history": [], "id": None})
-    context = contact_data["context"]
-    history = contact_data["history"]
-    contact_id = contact_data.get("id")
-    
+# === CONVERSATION INTERFACE COMPONENTS ===
+def render_conversation_header(contact_name, context, contact_id):
+    """Conversation view header with navigation"""
     st.markdown(f"### {CONTEXTS[context]['icon']} {contact_name} - {CONTEXTS[context]['description']}")
     
     # Navigation buttons
@@ -625,13 +533,40 @@ def render_conversation_view():
             }
             st.session_state.app_mode = "edit_contact_view"
             st.rerun()
+
+
+def render_relationship_progress(contact_name, history):
+    """Display relationship healing progress and insights"""
+    if not history:
+        return
     
-    # Relationship progress section
-    display_relationship_progress(contact_name, history)
-    
-    st.markdown("---")
-    
-    # Input section
+    with st.expander("📊 **Relationship Healing Progress**", expanded=False):
+        health_score, status = calculate_relationship_health_score(history)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Relationship Health", f"{health_score}/10", help="Based on recent healing scores")
+        with col2:
+            st.metric("Total Conversations", len(history))
+        
+        st.markdown(f"**Status:** {status}")
+        
+        # Healing insights
+        insights = get_healing_insights(history)
+        st.markdown("**💙 Your Healing Journey:**")
+        for insight in insights:
+            st.markdown(f"• {insight}")
+        
+        # Recent trend visualization
+        if len(history) >= 5:
+            recent_scores = [msg.get('healing_score', 0) for msg in history[-5:] if msg.get('healing_score')]
+            if recent_scores:
+                trend_text = " → ".join([str(score) for score in recent_scores])
+                st.markdown(f"**Recent Healing Scores:** {trend_text}")
+
+
+def render_conversation_input(contact_name, context, history):
+    """Main conversation input interface"""
     st.markdown("#### 💭 Your Input")
     st.markdown("*Share what happened - their message or your response that needs guidance*")
     
@@ -647,18 +582,21 @@ def render_conversation_view():
     if st.session_state.clear_conversation_input:
         st.session_state.clear_conversation_input = False
     
-    # Action buttons
+    render_action_buttons(contact_name, context, history)
+
+
+def render_action_buttons(contact_name, context, history):
+    """Action buttons for transform and interpret"""
     current_message = st.session_state.conversation_input_text
     
     col1, col2, col3 = st.columns([2, 2, 1])
     with col1:
         if st.button("✨ Transform with Love", key="transform_message", use_container_width=True):
-            process_message(contact_name, current_message, context)
+            process_conversation_message(contact_name, current_message, context, history)
     
     with col2:
-        # Interpret button
         if current_message.strip():
-            render_interpret_section(contact_name, current_message, context, history)
+            render_interpret_button(contact_name, current_message, context, history)
         else:
             st.button("🔍 Interpret", disabled=True, help="Enter a message first", use_container_width=True)
     
@@ -668,17 +606,64 @@ def render_conversation_view():
             st.session_state.clear_conversation_input = False
             st.session_state.last_error_message = None
             st.rerun()
-    
-    # Error display
-    if st.session_state.last_error_message:
-        st.error(st.session_state.last_error_message)
-    
-    # Show interpretation results if available
-    display_interpretation_result(contact_name)
-    
-    st.markdown("---")
-    
-    # AI Response section
+
+
+def render_interpret_button(contact_name, message, context, history):
+    """Interpret button and functionality"""
+    if st.button("🔍 Interpret - What do they really mean?", key="interpret_btn", help="Reveal emotional subtext and healing opportunities", use_container_width=True):
+        with st.spinner("🧠 Analyzing emotional subtext..."):
+            result = interpret_message(contact_name, message, context, history)
+            
+            if result.get("success"):
+                st.session_state[f"last_interpretation_{contact_name}"] = {
+                    "interpretation": result["interpretation"],
+                    "score": result["interpretation_score"],
+                    "timestamp": datetime.now().timestamp(),
+                    "original_message": message
+                }
+                
+                # Save to database
+                contact_data = st.session_state.contacts.get(contact_name, {})
+                contact_id = contact_data.get("id")
+                if contact_id:
+                    save_interpretation(contact_id, contact_name, message, result["interpretation"], result["interpretation_score"], result["model"])
+                
+                st.rerun()
+            else:
+                st.error(f"Could not analyze message: {result.get('error', 'Unknown error')}")
+
+
+def render_interpretation_result(contact_name):
+    """Display interpretation results if available"""
+    interp_key = f"last_interpretation_{contact_name}"
+    if interp_key in st.session_state:
+        interp_data = st.session_state[interp_key]
+        
+        # Show if recent (within 10 minutes)
+        if datetime.now().timestamp() - interp_data["timestamp"] < 600:
+            with st.expander("🔍 **Emotional Analysis - What They Really Mean**", expanded=True):
+                st.markdown(interp_data["interpretation"])
+                
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    score = interp_data["score"]
+                    if score >= 8:
+                        st.success(f"✨ Deep Insight Score: {score}/10 - Very revealing analysis")
+                    elif score >= 6:
+                        st.info(f"💡 Insight Score: {score}/10 - Good understanding")
+                    else:
+                        st.warning(f"🔍 Insight Score: {score}/10 - Basic analysis")
+                
+                with col2:
+                    if st.button("📋 Copy", key="copy_interpretation"):
+                        st.info("Click and drag to select the analysis above, then Ctrl+C to copy")
+        else:
+            # Clear old interpretation
+            del st.session_state[interp_key]
+
+
+def render_ai_response_section(contact_name):
+    """Display AI response section"""
     st.markdown("#### 🤖 The Third Voice Guidance")
     last_response_key = f"last_response_{contact_name}"
     
@@ -687,301 +672,62 @@ def render_conversation_view():
         
         # Show response if it's recent (within 5 minutes)
         if datetime.now().timestamp() - last_resp["timestamp"] < 300:
-            with st.container():
-                st.markdown("**Your AI Guidance:**")
-                st.text_area(
-                    "AI Guidance Output",
-                    value=last_resp['response'],
-                    height=200,
-                    key="ai_response_display",
-                    help="Click inside and Ctrl+A to select all, then Ctrl+C to copy",
-                    disabled=False,
-                    label_visibility="hidden"
-                )
-                
-                col_score, col_model, col_copy = st.columns([2, 2, 1])
-                with col_score:
-                    if last_resp["healing_score"] >= 8:
-                        st.success(f"✨ Healing Score: {last_resp['healing_score']}/10 - Transformative guidance")
-                    elif last_resp["healing_score"] >= 6:
-                        st.info(f"💙 Healing Score: {last_resp['healing_score']}/10 - Good guidance")
-                    else:
-                        st.warning(f"⚠️ Healing Score: {last_resp['healing_score']}/10 - Basic guidance")
-                
-                with col_model:
-                    st.caption(f"Model: {last_resp['model']}")
-                
-                with col_copy:
-                    if st.button("📋 Copy", key="copy_response"):
-                        st.info("Click inside the text area above, Ctrl+A to select all, then Ctrl+C to copy")
+            render_recent_ai_response(last_resp)
         else:
             # Clear old response
             del st.session_state[last_response_key]
+            render_ai_response_placeholder()
     else:
-        st.info("💡 Enter a message above and click **Transform with Love** to get AI guidance for healing communication.")
-    
-    st.markdown("---")
-    
-    # Conversation history section
-    if history:
-        st.markdown("#### 📚 Recent Conversations")
-        with st.expander(f"View {len(history)} conversation{'s' if len(history) != 1 else ''}", expanded=False):
-            # Show last 10 conversations in reverse chronological order
-            recent_history = history[-10:][::-1]
-            
-            for i, msg in enumerate(recent_history):
-                col_time, col_score = st.columns([3, 1])
-                
-                with col_time:
-                    st.markdown(f"**{msg['time']}** - {msg['type'].title()}")
-                
-                with col_score:
-                    if msg.get('healing_score', 0) > 0:
-                        score_color = "🟢" if msg['healing_score'] >= 7 else "🟡" if msg['healing_score'] >= 5 else "🔴"
-                        st.markdown(f"{score_color} {msg['healing_score']}/10")
-                
-                st.markdown(f"**Input:** {msg['original'][:100]}{'...' if len(msg['original']) > 100 else ''}")
-                
-                if msg.get('result'):
-                    st.markdown(f"**Response:** {msg['result'][:150]}{'...' if len(msg['result']) > 150 else ''}")
-                
-                if i < len(recent_history) - 1:
-                    st.markdown("---")
-    
-    # Add conversation-specific feedback
-    show_feedback_widget(f"conversation_{contact_name}")
+        render_ai_response_placeholder()
 
 
-# === MAIN APPLICATION ROUTER ===
-def main_app():
-    """Main application routing and logic"""
-    
-    # Try to restore session first
-    if not st.session_state.get("authenticated", False):
-        restore_user_session()
-    
-    # Handle verification notice display
-    if st.session_state.get("show_verification_notice", False):
-        verification_notice_page()
-        return
-    
-    # Authentication check
-    if not st.session_state.get("authenticated", False):
-        if st.session_state.app_mode == "signup":
-            signup_page()
-        else:
-            login_page()
-        return
-    
-    # Main authenticated app routing
-    app_mode = st.session_state.get("app_mode", "contacts_list")
-    
-    if app_mode == "first_time_setup":
-        render_first_time_screen()
-    elif app_mode == "contacts_list":
-        render_contacts_list_view()
-    elif app_mode == "add_contact_view":
-        render_add_contact_view()
-    elif app_mode == "edit_contact_view":
-        render_edit_contact_view()
-    elif app_mode == "conversation_view":
-        render_conversation_view()
-    else:
-        # Fallback to contacts list for unknown modes
-        st.session_state.app_mode = "contacts_list"
-        st.rerun()
+def render_recent_ai_response(last_resp):
+    """Display recent AI response"""
+    with st.container():
+        st.markdown("**Your AI Guidance:**")
+        st.text_area(
+            "AI Guidance Output",
+            value=last_resp['response'],
+            height=200,
+            key="ai_response_display",
+            help="Click inside and Ctrl+A to select all, then Ctrl+C to copy",
+            disabled=False,
+            label_visibility="hidden"
+        )
+        
+        col_score, col_model, col_copy = st.columns([2, 2, 1])
+        with col_score:
+            if last_resp["healing_score"] >= 8:
+                st.success(f"✨ Healing Score: {last_resp['healing_score']}/10")
+            elif last_resp["healing_score"] >= 6:
+                st.info(f"💡 Healing Score: {last_resp['healing_score']}/10")
+            else:
+                st.warning(f"🔧 Healing Score: {last_resp['healing_score']}/10")
+        
+        with col_model:
+            st.caption(f"🤖 Model: {last_resp.get('model', 'Unknown')}")
+        
+        with col_copy:
+            if st.button("📋", help="Click text area above and Ctrl+A to select all", key="copy_hint"):
+                st.info("💡 Click in text area above, then Ctrl+A and Ctrl+C to copy")
+        
+        if last_resp["healing_score"] >= 8:
+            st.balloons()
+            st.markdown("🌟 **High healing potential!** This guidance can really help transform your relationship.")
 
 
-# === SIDEBAR WITH USER INFO AND DEBUG ===
-def render_sidebar():
-    """Render sidebar with user info and debug information"""
-    if not st.session_state.get("authenticated", False):
-        return
+def render_ai_response_placeholder():
+    """Placeholder for AI response"""
+    st.info("💭 Your Third Voice guidance will appear here after you click Transform")
     
-    with st.sidebar:
-        st.markdown("### 👤 User Info")
-        
-        user_email = st.session_state.user.email if st.session_state.user else "Unknown"
-        st.markdown(f"**Email:** {user_email}")
-        
-        # User stats
-        try:
-            from data_backend import get_user_stats
-            stats = get_user_stats()
-            if stats:
-                st.markdown(f"**Contacts:** {stats.get('contact_count', 0)}")
-                st.markdown(f"**Messages:** {stats.get('message_count', 0)}")
-                if stats.get('last_activity'):
-                    last_activity = datetime.fromisoformat(stats['last_activity'].replace('Z', '+00:00'))
-                    st.markdown(f"**Last Active:** {last_activity.strftime('%m/%d %H:%M')}")
-        except:
-            pass
-        
-        st.markdown("---")
-        
-        # Sign out button
-        if st.button("🚪 Sign Out", use_container_width=True):
-            if sign_out():
-                st.rerun()
-        
-        st.markdown("---")
-        
-        # Debug section
-        with st.expander("🔧 Debug Info", expanded=False):
-            st.markdown(f"**App Mode:** {st.session_state.get('app_mode', 'Unknown')}")
-            st.markdown(f"**Active Contact:** {st.session_state.get('active_contact', 'None')}")
-            st.markdown(f"**Total Contacts:** {len(st.session_state.get('contacts', {}))}")
-            
-            # Database connection test
-            db_status = test_database_connection()
-            st.markdown(f"**Database:** {db_status}")
-            
-            # Model status
-            try:
-                model_info = get_model_status_info()
-                st.markdown(f"**AI Model:** {model_info}")
-            except:
-                st.markdown(f"**AI Model:** {MODEL}")
-        
-        st.markdown("---")
-        st.markdown("### 💙 Mission")
-        st.markdown("*Building healing conversations, one family at a time.*")
-        
-        st.markdown("**Built with love by a father fighting to return to his daughter.**")
-
-
-# === PAGE CONFIGURATION ===
-def configure_page():
-    """Configure Streamlit page settings and mobile optimization"""
-    st.set_page_config(
-        page_title="The Third Voice AI - Family Healing Through Better Communication",
-        page_icon="🎙️",
-        layout="wide",
-        initial_sidebar_state="collapsed",
-        menu_items={
-            'Get Help': None,
-            'Report a bug': None,
-            'About': "The Third Voice AI - When both people are speaking from pain, someone must be the third voice."
-        }
-    )
-    
-    # Mobile-optimized CSS
     st.markdown("""
-    <style>
-        /* Hide Streamlit branding and optimize for mobile */
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-        
-        /* Mobile-first responsive design */
-        .main .block-container {
-            padding-top: 1rem;
-            padding-bottom: 1rem;
-            padding-left: 1rem;
-            padding-right: 1rem;
-            max-width: 100%;
-        }
-        
-        /* Button styling for better mobile interaction */
-        .stButton > button {
-            width: 100%;
-            border-radius: 8px;
-            border: none;
-            padding: 0.75rem 1rem;
-            font-weight: 500;
-            transition: all 0.2s ease;
-        }
-        
-        .stButton > button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        
-        /* Text area improvements */
-        .stTextArea > div > div > textarea {
-            border-radius: 8px;
-            border: 2px solid #e0e0e0;
-            font-size: 16px;
-        }
-        
-        .stTextArea > div > div > textarea:focus {
-            border-color: #4CAF50;
-            box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
-        }
-        
-        /* Form styling */
-        .stForm {
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 1rem;
-            background: #fafafa;
-        }
-        
-        /* Expander styling */
-        .streamlit-expanderHeader {
-            border-radius: 8px;
-            background-color: #f0f2f6;
-        }
-        
-        /* Metric styling */
-        [data-testid="metric-container"] {
-            background-color: #f0f2f6;
-            border: 1px solid #e0e0e0;
-            padding: 1rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        
-        /* Success/error message styling */
-        .stSuccess, .stError, .stWarning, .stInfo {
-            border-radius: 8px;
-            padding: 1rem;
-        }
-        
-        /* Mobile-specific adjustments */
-        @media (max-width: 768px) {
-            .main .block-container {
-                padding-left: 0.5rem;
-                padding-right: 0.5rem;
-            }
-            
-            h1, h2, h3 {
-                font-size: 1.2em !important;
-                line-height: 1.3;
-            }
-            
-            .stButton > button {
-                padding: 0.6rem 0.8rem;
-                font-size: 14px;
-            }
-        }
-        
-        /* Dark mode support */
-        @media (prefers-color-scheme: dark) {
-            .stForm {
-                background: #2b2b2b;
-                border-color: #404040;
-            }
-            
-            [data-testid="metric-container"] {
-                background-color: #2b2b2b;
-                border-color: #404040;
-            }
-        }
-    </style>
-    """, unsafe_allow_html=True)
+    **💡 How it works:**
+    - Share what they said or what you want to say
+    - Get compassionate guidance that heals instead of hurts
+    - **🆕 Use "Interpret" to reveal what they really mean beneath their words**
+    - Build stronger relationships through understanding
+    """)
 
 
-# === MAIN EXECUTION ===
-if __name__ == "__main__":
-    # Configure page first
-    configure_page()
-    
-    # Initialize session state
-    init_session_state()
-    
-    # Render sidebar (only when authenticated)
-    render_sidebar()
-    
-    # Run main application
-    main_app()
+def render_conversation_history(history):
+    """Display conversation history"""
