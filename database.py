@@ -27,17 +27,6 @@ def init_supabase_connection():
 supabase = init_supabase_connection()
 
 # --- Helper Functions ---
-def get_current_user_id():
-    """Get the current authenticated user's ID"""
-    try:
-        session = supabase.auth.get_session()
-        if session and session.user:
-            return session.user.id
-        return None
-    except Exception as e:
-        st.error(f"Error getting user session: {e}")
-        return None
-
 def create_message_hash(message, context):
     """Create a hash for message caching"""
     return hashlib.md5(f"{message.strip().lower()}{context}".encode()).hexdigest()
@@ -46,6 +35,9 @@ def create_message_hash(message, context):
 @st.cache_data(ttl=30)  # Shorter cache time for more responsive updates
 def load_contacts_and_history():
     """Load all family conversation history - Sacred data that heals"""
+    # Import here to avoid circular imports
+    from core_auth import get_current_user_id
+    
     user_id = get_current_user_id()
     if not user_id:
         return {}
@@ -92,6 +84,9 @@ def load_contacts_and_history():
 # --- Data Saving Functions ---
 def save_contact(name, context, contact_id=None):
     """Save contact - Every contact represents a relationship to heal"""
+    # Import here to avoid circular imports
+    from core_auth import get_current_user_id
+    
     user_id = get_current_user_id()
     if not user_id or not name.strip():
         st.error("Cannot save contact: User not logged in or invalid input.")
@@ -129,6 +124,9 @@ def save_contact(name, context, contact_id=None):
 
 def delete_contact(contact_id):
     """Delete contact - Sometimes healing means letting go"""
+    # Import here to avoid circular imports
+    from core_auth import get_current_user_id
+    
     user_id = get_current_user_id()
     if not user_id or not contact_id:
         st.error("Cannot delete contact: User not logged in or invalid input.")
@@ -160,6 +158,9 @@ def delete_contact(contact_id):
 
 def save_message(contact_id, contact_name, message_type, original, result, emotional_state, healing_score, model_used, sentiment="unknown"):
     """Save message - Every message is a step toward healing"""
+    # Import here to avoid circular imports
+    from core_auth import get_current_user_id
+    
     user_id = get_current_user_id()
     if not user_id:
         st.error("Cannot save message: User not logged in.")
@@ -196,6 +197,9 @@ def save_message(contact_id, contact_name, message_type, original, result, emoti
 # --- Feedback System Functions ---
 def save_feedback(rating, feedback_text, feature_context="general"):
     """Save user feedback to database - Every feedback helps us heal more families"""
+    # Import here to avoid circular imports
+    from core_auth import get_current_user_id
+    
     user_id = get_current_user_id()
     if not user_id:
         return False
