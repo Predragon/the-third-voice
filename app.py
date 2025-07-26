@@ -9,8 +9,9 @@ from datetime import datetime, timezone
 import json
 
 # Import our backend services
-from auth_backend import init_session_state, sign_out, CONTEXTS
-from database import get_current_user_id, supabase, load_contacts_and_history
+from auth_backend import init_session_state, CONTEXTS
+from core_auth import sign_out, get_current_user_id
+from database import supabase, load_contacts_and_history
 from ai_engine import get_available_models, get_current_model
 
 # Import our UI components
