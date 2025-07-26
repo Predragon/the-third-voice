@@ -11,8 +11,9 @@ import json
 # Import our backend services
 from auth_backend import (
     init_session_state, get_current_user_id, supabase, sign_out,
-    load_contacts_and_history, CONTEXTS, get_available_models, get_current_model
+    load_contacts_and_history, CONTEXTS
 )
+from ai_engine import get_available_models, get_current_model
 
 # Import our UI components
 from auth_ui import (
