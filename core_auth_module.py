@@ -68,23 +68,6 @@ def signup_page():
             except Exception as e:
                 st.error(f"Signup failed: {str(e)}")
 
-# --- UI Components ---
-def render_first_time_screen():
-    st.title("👋 Welcome to The Third Voice")
-    # ... [your existing first-time setup UI] ...
-
-def render_contacts_list_view():
-    st.title("📞 Your Contacts")
-    # ... [your existing contacts list UI] ...
-
-def render_add_contact_view():
-    st.title("➕ Add New Contact")
-    # ... [your existing add contact UI] ...
-
-def render_edit_contact_view():
-    st.title("✏️ Edit Contact")
-    # ... [your existing edit contact UI] ...
-
 # --- Core Functions ---
 def init_session_state():
     defaults = {
@@ -116,4 +99,4 @@ def sign_out():
     st.session_state.clear()
     st.rerun()
 
-# ... [include all other missing functions your app.py expects] ...
+# ... [other functions as needed] ...
