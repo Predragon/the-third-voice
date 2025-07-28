@@ -8,7 +8,7 @@ from third_voice_ai.config import (
 from third_voice_ai.auth_manager import auth_manager
 from third_voice_ai.ai_processor import ai_processor
 #from ai_processor import ai_processor
-from prompts import prompt_manager
+from third_voice_ai.prompts import prompt_manager
 from utils import utils, show_feedback_widget, display_error, display_success
 from third_voice_ai.data_manager import data_manager
 from state_manager import state_manager
