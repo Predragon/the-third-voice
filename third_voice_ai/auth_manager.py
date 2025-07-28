@@ -4,8 +4,8 @@
 import streamlit as st
 from supabase import create_client, Client
 from typing import Optional, Dict, Any
-from state_manager import state_manager
-from config import ERROR_MESSAGES
+from .state_manager import state_manager
+from .config import ERROR_MESSAGES
 
 class AuthManager:
     """
