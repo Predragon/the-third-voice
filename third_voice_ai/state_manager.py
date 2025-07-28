@@ -3,7 +3,7 @@
 
 import streamlit as st
 from typing import Any, Dict, Optional, List
-from config import DEFAULT_SESSION_STATE, CONTEXTS
+from .config import DEFAULT_SESSION_STATE, CONTEXTS
 
 class StateManager:
     """
