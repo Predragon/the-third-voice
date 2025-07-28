@@ -16,7 +16,7 @@ from passlib.hash import bcrypt
 import pandas as pd
 import numpy as np
 from loguru import logger
-from dateutil.parser import parse  # Fixed import
+from dateutil.parser import parse
 from dotenv import load_dotenv
 import os
 
@@ -70,7 +70,7 @@ def show_auth_page():
                 
                 if auth_manager.sign_in(email, password):
                     state_manager.clear_error()
-                    st.experimental_rerun()
+                    st.rerun()  # Updated from experimental_rerun
                 else:
                     display_error(state_manager.get_error() or ERROR_MESSAGES["authentication_failed"])
     
@@ -92,7 +92,7 @@ def show_auth_page():
                 
                 if auth_manager.sign_up(email, password):
                     display_success(UI_MESSAGES["verification_sent"])
-                    st.experimental_rerun()
+                    st.rerun()  # Updated from experimental_rerun
                 else:
                     display_error(state_manager.get_error() or "Sign-up failed")
 
@@ -111,7 +111,7 @@ def show_verification_notice():
     if st.button("Back to Login"):
         state_manager.clear_verification_notice()
         state_manager.set_app_mode("login")
-        st.experimental_rerun()
+        st.rerun()  # Updated from experimental_rerun
 
 def show_main_app():
     """Display main application interface"""
@@ -127,7 +127,7 @@ def show_main_app():
         if st.button("Sign Out"):
             if auth_manager.sign_out():
                 state_manager.clear_authentication()
-                st.experimental_rerun()
+                st.rerun()  # Updated from experimental_rerun
         
         st.header("Contacts")
         if state_manager.get_app_mode() == "first_time_setup":
@@ -193,7 +193,7 @@ def show_add_contact():
                 state_manager.set_contacts(contacts)
                 state_manager.navigate_to("contacts_list")
                 display_success(f"Contact {name} added successfully!")
-                st.experimental_rerun()
+                st.rerun()  # Updated from experimental_rerun
 
 def show_contacts_list():
     """Display contacts list with basic stats"""
@@ -283,7 +283,7 @@ def show_conversation():
                     sentiment=result["sentiment"]
                 )
                 state_manager.clear_conversation_input()
-                st.experimental_rerun()
+                st.rerun()  # Updated from experimental_rerun
             else:
                 display_error(result["error"])
         
@@ -310,7 +310,7 @@ def show_conversation():
                     model_used=result["model"]
                 )
                 state_manager.clear_conversation_input()
-                st.experimental_rerun()
+                st.rerun()  # Updated from experimental_rerun
             else:
                 display_error(result["error"])
     
