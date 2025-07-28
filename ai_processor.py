@@ -207,6 +207,7 @@ Consider this relationship history when providing guidance. Reference patterns w
                     "sentiment": cached_response["sentiment"],
                     "emotional_state": cached_response["emotional_state"],
                     "model": cached_response["model"],
+                    "message_type": message_type,
                     "cached": True,
                     "success": True
                 }
