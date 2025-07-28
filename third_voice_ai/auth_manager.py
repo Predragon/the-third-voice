@@ -54,7 +54,7 @@ class AuthManager:
                     state_manager.set_authenticated(session.user)
                     
                     # Import here to avoid circular imports
-                    from data_manager import data_manager
+                    from .data_manager import data_manager
                     contacts = data_manager.load_contacts_and_history()
                     state_manager.set_contacts(contacts)
                     
@@ -99,7 +99,7 @@ class AuthManager:
                 state_manager.set_authenticated(response.user)
                 
                 # Load user data
-                from data_manager import data_manager
+                from .data_manager import data_manager
                 contacts = data_manager.load_contacts_and_history()
                 state_manager.set_contacts(contacts)
                 
@@ -131,7 +131,7 @@ class AuthManager:
                 state_manager.clear_authentication()
                 
                 # Clear any cached data
-                from data_manager import data_manager
+                from .data_manager import data_manager
                 data_manager.clear_cache()
                 
                 st.info("You have been logged out.")
