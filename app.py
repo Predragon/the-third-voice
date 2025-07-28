@@ -16,7 +16,7 @@ from passlib.hash import bcrypt
 import pandas as pd
 import numpy as np
 from loguru import logger
-from python_dateutil import parser
+from dateutil.parser import parse  # Fixed import
 from dotenv import load_dotenv
 import os
 
