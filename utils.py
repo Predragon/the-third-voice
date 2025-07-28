@@ -321,3 +321,63 @@ class Utils:
 
 # Global utils instance
 utils = Utils()
+
+# Standalone function wrappers for backwards compatibility
+def format_timestamp(timestamp):
+    return Utils.format_timestamp(timestamp)
+
+def validate_contact_name(name):
+    return bool(name and name.strip())
+
+def sanitize_input(text):
+    return Utils.clean_contact_name(text)
+
+def get_relationship_health_status(history):
+    if not history:
+        return 0, "No conversations yet"
+    
+    scores = [msg.get('healing_score', 5) for msg in history if 'healing_score' in msg]
+    if not scores:
+        return 5, "Building connection"
+    
+    avg_score = sum(scores) / len(scores)
+    status = Utils.get_relationship_health_status(avg_score)
+    return round(avg_score, 1), status
+
+def calculate_healing_trend(history):
+    if len(history) < 3:
+        return "Building foundation"
+    
+    recent_scores = [msg.get('healing_score', 5) for msg in history[-5:] if 'healing_score' in msg]
+    older_scores = [msg.get('healing_score', 5) for msg in history[-10:-5] if 'healing_score' in msg]
+    
+    if not recent_scores or not older_scores:
+        return "Establishing patterns"
+    
+    recent_avg = sum(recent_scores) / len(recent_scores)
+    older_avg = sum(older_scores) / len(older_scores)
+    
+    if recent_avg > older_avg + 0.5:
+        return "Improving steadily"
+    elif recent_avg < older_avg - 0.5:
+        return "Needs attention"
+    else:
+        return "Stable progress"
+
+def show_feedback_widget(context="general"):
+    import streamlit as st
+    with st.expander("💭 Share Feedback", expanded=False):
+        feedback = st.text_area("How can we improve?", key=f"feedback_{context}")
+        if st.button("Submit Feedback", key=f"submit_{context}"):
+            if feedback.strip():
+                st.success("Thank you for your feedback!")
+            else:
+                st.warning("Please enter some feedback first.")
+
+def display_error(message):
+    import streamlit as st
+    st.error(f"❌ {message}")
+
+def display_success(message):
+    import streamlit as st
+    st.success(f"✅ {message}")
