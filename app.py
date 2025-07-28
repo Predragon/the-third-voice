@@ -12,7 +12,7 @@ from config import (
     CONTEXTS, PAGE_CONFIG, UI_MESSAGES, ERROR_MESSAGES
 )
 from state_manager import state_manager
-from auth_py.py import AuthManager
+from auth.py import AuthManager
 from data_manager import DataManager
 from ai_processor import AIProcessor
 from utils import (
