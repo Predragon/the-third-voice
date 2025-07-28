@@ -4,9 +4,9 @@
 import streamlit as st
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
-from auth_manager import auth_manager
-from utils import utils
-from config import CACHE_TTL
+from .auth_manager import auth_manager
+from .utils import utils
+from .config import CACHE_TTL
 
 class DataManager:
     """
