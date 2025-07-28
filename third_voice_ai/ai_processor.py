@@ -5,10 +5,10 @@ import streamlit as st
 import requests
 from datetime import datetime
 from typing import Dict, Any, Optional, List
-from config import API_URL, MODEL, DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS, API_TIMEOUT, ERROR_MESSAGES
-from utils import utils
-from auth_manager import auth_manager
-from data_manager import data_manager
+from .config import API_URL, MODEL, DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS, API_TIMEOUT, ERROR_MESSAGES
+from .utils import utils
+from .auth_manager import auth_manager
+from .data_manager import data_manager
 
 class AIProcessor:
     """
