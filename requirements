@@ -1,0 +1,13 @@
+# The Third Voice AI - Requirements for Step 1
+# Optimized for Streamlit Cloud and mobile deployment
+
+# Core Framework
+streamlit==1.47.1
+
+# Future dependencies for Step 2 (uncomment when adding auth.py, data_manager.py, ai_processor.py)
+# supabase>=2.3.0
+# requests>=2.31.0
+# python-dotenv>=1.0.0  # Optional if using .env locally
+
+# Note: Excluded aiohttp as requests is sufficient for API calls
+# Excluded sentry-sdk to keep minimal for mobile constraints
