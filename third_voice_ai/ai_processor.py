@@ -194,7 +194,7 @@ Consider this relationship history when providing guidance. Reference patterns w
         message_hash = utils.create_message_hash(message, context)
         
         # Get contact data
-        from state_manager import state_manager
+        from .state_manager import state_manager
         contact_data = state_manager.get_contact_data(contact_name)
         contact_id = contact_data.get("id")
         
