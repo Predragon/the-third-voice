@@ -5,7 +5,7 @@ from config import (
     APP_NAME, APP_ICON, PAGE_CONFIG, CONTEXTS, UI_MESSAGES,
     ENABLE_ANALYTICS, ENABLE_FEEDBACK, ENABLE_INTERPRETATION, ERROR_MESSAGES
 )
-from auth_manager import auth_manager
+from third_voice_ai.auth_manager import auth_manager
 from third_voice_ai.ai_processor import ai_processor
 #from ai_processor import ai_processor
 from prompts import prompt_manager
