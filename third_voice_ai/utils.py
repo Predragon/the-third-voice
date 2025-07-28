@@ -6,7 +6,7 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
-from config import HEALING_SCORE_THRESHOLDS, CONTEXTS
+from .config import HEALING_SCORE_THRESHOLDS, CONTEXTS
 
 class Utils:
     """Utility functions for The Third Voice AI"""
