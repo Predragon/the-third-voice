@@ -6,7 +6,7 @@ from config import (
     ENABLE_ANALYTICS, ENABLE_FEEDBACK, ENABLE_INTERPRETATION, ERROR_MESSAGES
 )
 from auth_manager import auth_manager
-from third_voice_ai.ai_processor import AIProcessor
+from third_voice_ai.ai_processor import ai_processor
 #from ai_processor import ai_processor
 from prompts import prompt_manager
 from utils import utils, show_feedback_widget, display_error, display_success
