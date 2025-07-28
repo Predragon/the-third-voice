@@ -1,7 +1,7 @@
 import streamlit as st
 from datetime import datetime
 from typing import Dict, Any, Optional
-from config import (
+from third_voice_ai.config import (
     APP_NAME, APP_ICON, PAGE_CONFIG, CONTEXTS, UI_MESSAGES,
     ENABLE_ANALYTICS, ENABLE_FEEDBACK, ENABLE_INTERPRETATION, ERROR_MESSAGES
 )
