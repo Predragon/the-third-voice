@@ -218,8 +218,39 @@ def show_contacts_list():
         })
     
     df = pd.DataFrame(contact_stats)
-    st.dataframe(df, use_container_width=True)
-    
+   # st.dataframe(df, use_container_width=True)
+    # Display contacts in a nice card format
+for contact_stat in contact_stats:
+    with st.container():
+        col1, col2, col3, col4 = st.columns([3, 2, 1, 2])
+        
+        with col1:
+            # Contact name and context
+            st.markdown(f"**{contact_stat['Name']}**")
+            st.caption(contact_stat['Context'])
+        
+        with col2:
+            # Messages count
+            st.metric("Messages", contact_stat['Messages'])
+        
+        with col3:
+            # Health score with color
+            score = contact_stat['Health Score']
+            if score >= 75:
+                st.success(f"💚 {score}")
+            elif score >= 50:
+                st.warning(f"💛 {score}")
+            else:
+                st.error(f"❤️ {score}")
+        
+        with col4:
+            # Action button
+            if st.button(f"Open", key=f"open_{contact_stat['Name']}"):
+                state_manager.set_active_contact(contact_stat['Name'])
+                state_manager.navigate_to("conversation")
+                st.rerun()
+        
+        st.divider()  # Nice separator between
     if ENABLE_ANALYTICS:
         stats = data_manager.get_user_stats()
         st.subheader("Your Stats")
