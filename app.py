@@ -466,7 +466,7 @@ def show_contacts_list():
             st.metric("Avg Healing Score", f"{stats.get('avg_healing_score', 0):.1f}")
     
     # Add feedback widget for contacts experience
-    if ENABLE_FEEDBACK:
+   # if ENABLE_FEEDBACK:
         show_feedback_widget("contacts_list")
 
 def show_conversation():
