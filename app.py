@@ -741,7 +741,7 @@ def show_conversation():
     if ENABLE_FEEDBACK:
         show_feedback_widget(f"conversation_{active_contact}")
 
-def show_edit_contact():
+ def show_edit_contact():
     """Display edit contact page"""
     edit_contact = state_manager.get_edit_contact()
     if not edit_contact:
@@ -756,4 +756,61 @@ def show_edit_contact():
         state_manager.set_edit_contact(None)
         st.rerun()
     
-    with st.form("edit_contact
+    with st.form("edit_contact_form"):
+        new_name = st.text_input("Contact Name", value=edit_contact['name'])
+        new_context = st.selectbox(
+            "Relationship Type",
+            list(CONTEXTS.keys()),
+            index=list(CONTEXTS.keys()).index(edit_contact['context']),
+            format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()} - {CONTEXTS[x]['description']}"
+        )
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.form_submit_button("💾 Save Changes", use_container_width=True):
+                if new_name.strip():
+                    if data_manager.update_contact(
+                        contact_id=edit_contact['id'],
+                        old_name=edit_contact['name'],
+                        new_name=new_name.strip(),
+                        new_context=new_context
+                    ):
+                        # Update session state
+                        contacts = data_manager.load_contacts_and_history()
+                        state_manager.set_contacts(contacts)
+                        state_manager.set_active_contact(new_name.strip())
+                        display_success(f"Updated contact: {new_name.strip()}")
+                        state_manager.navigate_to("conversation")
+                        state_manager.set_edit_contact(None)
+                        st.rerun()
+                    else:
+                        display_error("Failed to update contact")
+                else:
+                    display_error("Contact name cannot be empty")
+        
+        with col2:
+            if st.form_submit_button("🗑️ Delete Contact", use_container_width=True, type="secondary"):
+                if data_manager.delete_contact(edit_contact['id'], edit_contact['name']):
+                    contacts = data_manager.load_contacts_and_history()
+                    state_manager.set_contacts(contacts)
+                    display_success(f"Deleted contact: {edit_contact['name']}")
+                    state_manager.navigate_to("contacts_list")
+                    state_manager.set_active_contact(None)
+                    state_manager.set_edit_contact(None)
+                    st.rerun()
+                else:
+                    display_error("Failed to delete contact")
+    
+    # Warning about deletion
+    st.warning("⚠️ Deleting a contact will permanently remove all conversation history with them.")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        logger.error(f"Application error: {str(e)}")
+        st.error("An unexpected error occurred. Please refresh the page.")
+        if st.button("🔄 Refresh Page"):
+            st.rerun()
