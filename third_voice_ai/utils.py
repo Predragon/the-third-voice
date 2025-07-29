@@ -1,7 +1,6 @@
 # utils.py - The Third Voice AI Utilities
 # Helper functions, error handling, and common operations
 
-import streamlit as st
 import hashlib
 import json
 from datetime import datetime, timezone
@@ -322,17 +321,29 @@ class Utils:
 # Global utils instance
 utils = Utils()
 
-# Standalone function wrappers for backwards compatibility
+# Core utility function wrappers for backwards compatibility
 def format_timestamp(timestamp):
+    """Format timestamp for display"""
     return Utils.format_timestamp(timestamp)
 
 def validate_contact_name(name):
+    """Validate contact name is not empty"""
     return bool(name and name.strip())
 
 def sanitize_input(text):
+    """Clean and sanitize user input"""
     return Utils.clean_contact_name(text)
 
 def get_relationship_health_status(history):
+    """
+    Calculate relationship health from conversation history
+    
+    Args:
+        history: List of conversation messages
+        
+    Returns:
+        Tuple of (avg_score, status_message)
+    """
     if not history:
         return 0, "No conversations yet"
     
@@ -345,6 +356,15 @@ def get_relationship_health_status(history):
     return round(avg_score, 1), status
 
 def calculate_healing_trend(history):
+    """
+    Calculate healing trend from conversation history
+    
+    Args:
+        history: List of conversation messages
+        
+    Returns:
+        Trend description string
+    """
     if len(history) < 3:
         return "Building foundation"
     
@@ -363,21 +383,3 @@ def calculate_healing_trend(history):
         return "Needs attention"
     else:
         return "Stable progress"
-
-def show_feedback_widget(context="general"):
-    import streamlit as st
-    with st.expander("💭 Share Feedback", expanded=False):
-        feedback = st.text_area("How can we improve?", key=f"feedback_{context}")
-        if st.button("Submit Feedback", key=f"submit_{context}"):
-            if feedback.strip():
-                st.success("Thank you for your feedback!")
-            else:
-                st.warning("Please enter some feedback first.")
-
-def display_error(message):
-    import streamlit as st
-    st.error(f"❌ {message}")
-
-def display_success(message):
-    import streamlit as st
-    st.success(f"✅ {message}")

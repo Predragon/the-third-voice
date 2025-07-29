@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from .auth_manager import auth_manager
 from .utils import utils
+from .ui.components import display_error, display_success, show_feedback_widget
 from .config import CACHE_TTL
 
 class DataManager:
@@ -82,7 +83,7 @@ class DataManager:
         """
         user_id = auth_manager.get_current_user_id()
         if not user_id or not name.strip():
-            st.error("Cannot save contact: User not logged in or invalid input.")
+            display_error("Cannot save contact: User not logged in or invalid input.")
             return False
         
         try:
@@ -105,54 +106,96 @@ class DataManager:
                 self.clear_cache()
                 return True
             else:
-                st.error("Failed to save contact")
+                display_error("Failed to save contact")
                 return False
                 
         except Exception as e:
             if "duplicate key value violates unique constraint" in str(e):
-                st.error(f"A contact with the name '{name}' already exists.")
+                display_error(f"A contact with the name '{name}' already exists.")
             else:
-                st.error(f"Error saving contact: {e}")
+                display_error(f"Error saving contact: {e}")
             return False
     
-    def delete_contact(self, contact_id: str) -> bool:
+    def update_contact(self, contact_id: str, old_name: str, new_name: str, new_context: str) -> bool:
+        """
+        Update an existing contact
+        
+        Args:
+            contact_id: Contact ID to update
+            old_name: Current contact name
+            new_name: New contact name
+            new_context: New relationship context
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        user_id = auth_manager.get_current_user_id()
+        if not user_id:
+            display_error("Cannot update contact: User not logged in.")
+            return False
+        
+        try:
+            contact_data = {
+                "name": utils.clean_contact_name(new_name),
+                "context": new_context,
+                "updated_at": utils.get_current_utc_timestamp()
+            }
+            
+            # Update contact
+            response = self.supabase.table("contacts").update(contact_data).eq("id", contact_id).eq("user_id", user_id).execute()
+            
+            if response.data:
+                # Update message records with new contact name if name changed
+                if old_name != new_name:
+                    self.supabase.table("messages").update({"contact_name": new_name}).eq("contact_id", contact_id).eq("user_id", user_id).execute()
+                
+                self.clear_cache()
+                return True
+            else:
+                display_error("Failed to update contact")
+                return False
+                
+        except Exception as e:
+            if "duplicate key value violates unique constraint" in str(e):
+                display_error(f"A contact with the name '{new_name}' already exists.")
+            else:
+                display_error(f"Error updating contact: {e}")
+            return False
+    
+    def delete_contact(self, contact_id: str, contact_name: str) -> bool:
         """
         Delete a contact and all associated messages
         
         Args:
             contact_id: ID of contact to delete
+            contact_name: Name of contact to delete
             
         Returns:
             True if successful, False otherwise
         """
         user_id = auth_manager.get_current_user_id()
         if not user_id or not contact_id:
-            st.error("Cannot delete contact: User not logged in or invalid input.")
+            display_error("Cannot delete contact: User not logged in or invalid input.")
             return False
         
         try:
-            # Get contact info first
-            contact_response = self.supabase.table("contacts").select("name").eq("id", contact_id).eq("user_id", user_id).execute()
+            # Delete the contact (messages will be cascade deleted due to FK constraint)
+            response = self.supabase.table("contacts").delete().eq("id", contact_id).eq("user_id", user_id).execute()
             
-            if contact_response.data:
-                contact_name = contact_response.data[0]["name"]
-                
-                # Delete the contact (messages will be cascade deleted due to FK constraint)
-                self.supabase.table("contacts").delete().eq("id", contact_id).eq("user_id", user_id).execute()
-                
+            if response.data:
                 # Clear any cached responses for this contact
-                from state_manager import state_manager
+                from .state_manager import state_manager
                 state_manager.clear_last_response(contact_name)
                 state_manager.clear_last_interpretation(contact_name)
                 
                 self.clear_cache()
                 return True
             else:
-                st.error("Contact not found")
+                display_error("Contact not found")
                 return False
                 
         except Exception as e:
-            st.error(f"Error deleting contact: {e}")
+            display_error(f"Error deleting contact: {e}")
             return False
     
     def save_message(self, contact_id: str, contact_name: str, message_type: str, 
@@ -177,7 +220,7 @@ class DataManager:
         """
         user_id = auth_manager.get_current_user_id()
         if not user_id:
-            st.error("Cannot save message: User not logged in.")
+            display_error("Cannot save message: User not logged in.")
             return False
         
         try:
@@ -201,11 +244,11 @@ class DataManager:
                 self.clear_cache()
                 return True
             else:
-                st.error("Failed to save message")
+                display_error("Failed to save message")
                 return False
                 
         except Exception as e:
-            st.error(f"Error saving message: {e}")
+            display_error(f"Error saving message: {e}")
             return False
     
     def save_interpretation(self, contact_id: str, contact_name: str, original_message: str, 
@@ -277,7 +320,7 @@ class DataManager:
             return bool(response.data)
             
         except Exception as e:
-            st.error(f"Error saving feedback: {e}")
+            display_error(f"Error saving feedback: {e}")
             return False
     
     def get_cached_ai_response(self, contact_id: str, message_hash: str) -> Optional[Dict[str, Any]]:
