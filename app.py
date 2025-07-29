@@ -738,10 +738,11 @@ def show_conversation():
         st.info("📝 No conversation history yet. Share what's happening above to get your first Third Voice guidance!")
     
     # Add feedback widget specific to this conversation experience
+  # Add feedback widget specific to this conversation experience
     if ENABLE_FEEDBACK:
         show_feedback_widget(f"conversation_{active_contact}")
 
- def show_edit_contact():
+def show_edit_contact():
     """Display edit contact page"""
     edit_contact = state_manager.get_edit_contact()
     if not edit_contact:
@@ -814,3 +815,4 @@ if __name__ == "__main__":
         st.error("An unexpected error occurred. Please refresh the page.")
         if st.button("🔄 Refresh Page"):
             st.rerun()
+    
