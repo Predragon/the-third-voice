@@ -220,7 +220,7 @@ def show_contacts_list():
     df = pd.DataFrame(contact_stats)
    # st.dataframe(df, use_container_width=True)
     # Display contacts in a nice card format
-for contact_stat in contact_stats:
+    for contact_stat in contact_stats:
     with st.container():
         col1, col2, col3, col4 = st.columns([3, 2, 1, 2])
         
