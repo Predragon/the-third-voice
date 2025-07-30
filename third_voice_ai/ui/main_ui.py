@@ -11,6 +11,7 @@ from .components import (
     create_metric_card
 )
 from ..config import CONTEXTS, ENABLE_ANALYTICS, ENABLE_INTERPRETATION, ERROR_MESSAGES
+from ..prompts import get_healing_score_explanation
 from loguru import logger
 
 
@@ -29,7 +30,10 @@ class MainUI:
         with st.sidebar:
             st.markdown("### 🎙️ The Third Voice AI")
             user = state_manager.get_user()
-            st.write(f"**{user.email}**")
+            if user:
+                st.write(f"**{user.email}**")
+            else:
+                st.write("**Guest**")
             
             if show_navigation_button("🚪 Logout", "logout_btn"):
                 if auth_manager.sign_out():
@@ -389,19 +393,14 @@ class MainUI:
             st.markdown(f"### {CONTEXTS[context]['icon']} {active_contact} - {CONTEXTS[context]['description']}")
         
         with col2:
-            # Small edit button aligned to the right
             if st.button("✏️", key="edit_contact_btn", help="Edit contact", use_container_width=False):
-                # Check if state_manager has the method before calling it
-                if hasattr(state_manager, 'set_edit_contact'):
-                    state_manager.set_edit_contact({
-                        "id": contact_id,
-                        "name": active_contact,
-                        "context": context
-                    })
-                    state_manager.navigate_to("edit_contact")
-                    st.rerun()
-                else:
-                    display_error("Edit functionality is not available. Please contact support.")
+                state_manager.set_edit_contact({
+                    "id": contact_id,
+                    "name": active_contact,
+                    "context": context
+                })
+                state_manager.navigate_to("edit_contact")
+                st.rerun()
     
     @staticmethod
     def _show_conversation_navigation(state_manager) -> None:
@@ -430,10 +429,9 @@ class MainUI:
     @staticmethod
     def _show_input_section(state_manager, data_manager, ai_processor, active_contact: str, context: str, history: list, contact_id: str) -> None:
         """Show message input section"""
-        # Handle input clearing at the start of render
+        logger.debug(f"Rendering input section for {active_contact}, clear flag: {state_manager.should_clear_input()}, input length: {len(state_manager.get_conversation_input())}")
         if state_manager.should_clear_input():
-            if 'conversation_input_text' in st.session_state:
-                st.session_state.conversation_input_text = ""
+            st.session_state.conversation_input_text = ""
             state_manager.reset_clear_flag()
 
         st.markdown("#### 💭 Your Input")
@@ -447,6 +445,7 @@ class MainUI:
             placeholder="Examples:\n• They said: 'You never listen to me!'\n• I want to tell them: 'I'm frustrated with your attitude'\n• We had a fight about...",
             height=120
         )
+        logger.debug(f"Text area rendered with message: {message[:50]}...")
         
         # Action buttons
         col1, col2, col3 = create_three_column_layout()
@@ -458,11 +457,13 @@ class MainUI:
                     MainUI._process_transform_message(state_manager, data_manager, ai_processor, active_contact, context, history, contact_id, message)
         
         with col2:
+            logger.debug(f"Interpret button state: enabled={ENABLE_INTERPRETATION and bool(message.strip())}, text_length={len(message.strip())}")
             if ENABLE_INTERPRETATION and message.strip():
                 if show_navigation_button("🔍 Interpret - What do they really mean?", "interpret_btn"):
+                    logger.info(f"Interpret button clicked for {active_contact}, message: {message[:50]}...")
                     MainUI._process_interpret_message(state_manager, data_manager, ai_processor, active_contact, context, history, contact_id, message)
             else:
-                st.button("🔍 Interpret", disabled=True, help="Enter a message first", use_container_width=True)
+                st.button("🔍 Interpret", disabled=True, help="Enter a message first", key="interpret_btn_disabled", use_container_width=True)
         
         with col3:
             if show_navigation_button("🗑️ Clear", "clear_input_btn"):
@@ -484,11 +485,13 @@ class MainUI:
 
             # Process message with AI
             logger.info(f"Calling ai_processor.process_message for {active_contact}")
+            is_incoming = utils.detect_message_type(message) == "translate"
             result = ai_processor.process_message(
                 contact_name=active_contact,
                 message=message,
                 context=context,
-                history=history
+                history=history,
+                is_incoming=is_incoming
             )
             logger.debug(f"AI processor result: {result}")
 
@@ -525,6 +528,7 @@ class MainUI:
     @staticmethod
     def _process_interpret_message(state_manager, data_manager, ai_processor, active_contact: str, context: str, history: list, contact_id: str, message: str) -> None:
         """Process interpret message request"""
+        logger.debug(f"Processing interpret message for contact: {active_contact}, message: {message[:50]}..., context: {context}, history length: {len(history)}")
         try:
             result = ai_processor.interpret_message(
                 contact_name=active_contact,
@@ -532,10 +536,12 @@ class MainUI:
                 context=context,
                 history=history
             )
+            logger.debug(f"Interpret message result: {result}")
             
             if result["success"]:
+                logger.info(f"Saving interpretation for contact_id: {contact_id}")
                 state_manager.set_last_interpretation(active_contact, result)
-                data_manager.save_interpretation(
+                save_success = data_manager.save_interpretation(
                     contact_id=contact_id,
                     contact_name=active_contact,
                     original_message=message,
@@ -543,11 +549,20 @@ class MainUI:
                     interpretation_score=result["interpretation_score"],
                     model_used=result["model"]
                 )
-                st.rerun()
+                
+                if save_success:
+                    logger.info(f"Interpretation saved successfully for {active_contact}")
+                    state_manager.set('clear_conversation_input', True)
+                    st.rerun()
+                else:
+                    logger.error("Failed to save interpretation in data_manager")
+                    display_error("Failed to save interpretation. Please try again.")
             else:
-                display_error(result["error"])
+                error_msg = result.get("error", "Unknown error in interpretation")
+                logger.error(f"Interpretation failed: {error_msg}")
+                display_error(error_msg)
         except Exception as e:
-            logger.error(f"Error interpreting message: {str(e)}")
+            logger.exception(f"Error interpreting message for {active_contact}: {str(e)}")
             display_error("Failed to interpret message. Please try again.")
     
     @staticmethod
@@ -561,7 +576,7 @@ class MainUI:
                 col1, col2 = create_two_column_layout()
                 with col1:
                     score = last_interpretation["interpretation_score"]
-                    show_healing_score_display(score)
+                    st.markdown(f"**Healing Score**: {get_healing_score_explanation(score)}")
                 
                 with col2:
                     if show_copy_button("📋 Copy", "copy_interpretation"):
@@ -589,7 +604,7 @@ class MainUI:
                 col_score, col_model, col_copy = create_three_column_layout()
                 with col_score:
                     healing_score = last_response.get("healing_score", 0)
-                    show_healing_score_display(healing_score, show_balloons=(healing_score >= 8))
+                    st.markdown(f"**Healing Score**: {get_healing_score_explanation(healing_score)}")
                 
                 with col_model:
                     st.caption(f"🤖 Model: {last_response.get('model', 'Unknown')}")
@@ -645,11 +660,9 @@ class MainUI:
                 "Relationship Type",
                 list(CONTEXTS.keys()),
                 "edit_contact_context",
-                format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()} - {CONTEXTS[x]['description']}"
+                format_func=lambda x: f"{CONTEXTS[x]['icon']} {x.title()} - {CONTEXTS[x]['description']}",
+                index=list(CONTEXTS.keys()).index(edit_contact['context'])
             )
-            # Set the current context as default
-            if edit_contact['context'] in CONTEXTS:
-                st.session_state.edit_contact_context = edit_contact['context']
             
             col1, col2 = create_two_column_layout()
             
@@ -672,14 +685,12 @@ class MainUI:
                     new_name=new_name.strip(),
                     new_context=new_context
                 ):
-                    # Update session state
                     contacts = data_manager.load_contacts_and_history()
                     state_manager.set_contacts(contacts)
                     state_manager.set_active_contact(new_name.strip())
                     display_success(f"Updated contact: {new_name.strip()}")
                     state_manager.navigate_to("conversation")
-                    if hasattr(state_manager, 'set_edit_contact'):
-                        state_manager.set_edit_contact(None)
+                    state_manager.set_edit_contact(None)
                     st.rerun()
                 else:
                     display_error("Failed to update contact")
@@ -699,8 +710,7 @@ class MainUI:
                 display_success(f"Deleted contact: {edit_contact['name']}")
                 state_manager.navigate_to("contacts_list")
                 state_manager.set_active_contact(None)
-                if hasattr(state_manager, 'set_edit_contact'):
-                    state_manager.set_edit_contact(None)
+                state_manager.set_edit_contact(None)
                 st.rerun()
             else:
                 display_error("Failed to delete contact")
