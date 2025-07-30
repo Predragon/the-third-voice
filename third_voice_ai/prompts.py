@@ -1,296 +1,256 @@
-# prompts.py - AI Prompt Templates for The Third Voice AI
-# Centralized prompt management for consistent AI responses
+# prompts.py - Prompt management for The Third Voice AI
 
-from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional
+import streamlit as st
 
 class PromptManager:
-    """Manages AI prompts with relationship context and conversation memory"""
+    """Manages AI prompts for message transformation, interpretation, and relationship analysis"""
     
-    def __init__(self):
-        self.base_system_prompt = """You are a compassionate relationship guide helping families heal through better communication. Your responses should be:
-- Loving and understanding, never judgmental
-- Practical and actionable
-- Focused on healing and building connection
-- Appropriate for the relationship context
-- 2-3 paragraphs maximum for clarity"""
-    
-    def get_transformation_prompt(self, contact_name: str, context: str, message: str, 
-                                history: Optional[List[Dict]] = None, is_incoming: bool = False) -> str:
-        """Generate prompt for message transformation with relationship memory"""
+    @staticmethod
+    def get_transformation_prompt(
+        contact_name: str,
+        context: str,
+        message: str,
+        history: Optional[List[Dict]] = None,
+        is_incoming: bool = False
+    ) -> str:
+        """
+        Generate system prompt for message transformation
         
-        # Build relationship context
-        relationship_context = self._build_relationship_context(history)
-        
-        # Determine message direction
-        if is_incoming:
-            mode_instruction = f"""
-INCOMING MESSAGE from {contact_name}: They said something that may have triggered you or needs understanding.
-Your task: Help the user understand what {contact_name} really means and suggest a loving response that heals rather than escalates."""
-        else:
-            mode_instruction = f"""
-OUTGOING MESSAGE to {contact_name}: The user wants to say something that might come across poorly.
-Your task: Reframe their message to be constructive, loving, and likely to strengthen the relationship."""
-        
-        context_description = self._get_context_description(context)
-        
-        prompt = f"""{self.base_system_prompt}
-
-RELATIONSHIP CONTEXT: {context_description} with {contact_name}
-{relationship_context}
-
-{mode_instruction}
-
-MESSAGE TO TRANSFORM: "{message}"
-
-Provide guidance that:
-1. Acknowledges the emotions involved
-2. Offers a healing perspective or reframe
-3. Suggests specific words or approach
-4. Considers the {context} relationship dynamics
-5. Aims for connection over being "right"
-
-Keep your response concise, practical, and focused on healing this specific relationship."""
-
-        return prompt
-    
-    def get_interpretation_prompt(self, contact_name: str, context: str, message: str, 
-                                history: Optional[List[Dict]] = None) -> str:
-        """Generate prompt for emotional subtext interpretation"""
-        
-        relationship_context = self._build_relationship_context(history, for_interpretation=True)
-        context_description = self._get_context_description(context)
-        
-        prompt = f"""You are an expert relationship therapist analyzing emotional subtext with deep compassion.
-
-RELATIONSHIP: {context_description} with {contact_name}
-{relationship_context}
-
-MESSAGE TO ANALYZE: "{message}"
-
-Provide insights in exactly this format:
-
-**🎭 EMOTIONAL SUBTEXT**
-What they're really feeling beneath the words (1-2 sentences)
-
-**💔 UNMET NEEDS** 
-What they actually need but can't express (1-2 sentences)
-
-**🌱 HEALING OPPORTUNITIES**
-Specific ways to address their deeper needs (2-3 actionable suggestions)
-
-**⚠️ WATCH FOR**
-Relationship patterns or warning signs (1 sentence)
-
-Be direct but loving. This person is trying to heal their family."""
-
-        return prompt
-    
-    def get_feedback_analysis_prompt(self, feedback_text: str, rating: int, feature_context: str) -> str:
-        """Generate prompt for analyzing user feedback"""
-        
-        prompt = f"""Analyze this user feedback for The Third Voice AI, a family healing communication app:
-
-FEATURE CONTEXT: {feature_context}
-RATING: {rating}/5 stars
-FEEDBACK: "{feedback_text}"
-
-Provide a brief analysis focusing on:
-1. What's working well
-2. Pain points or frustrations
-3. Suggested improvements
-4. User sentiment and satisfaction level
-
-Keep response under 100 words, actionable for developers."""
-
-        return prompt
-    
-    def get_conversation_summary_prompt(self, contact_name: str, context: str, 
-                                     history: List[Dict]) -> str:
-        """Generate prompt for summarizing conversation patterns"""
-        
-        if not history or len(history) < 3:
-            return None
-        
-        # Prepare conversation data
-        conversation_data = []
-        for msg in history[-10:]:  # Last 10 messages
-            if msg.get('original') and msg.get('healing_score'):
-                conversation_data.append(f"Message: '{msg['original'][:50]}...' (Score: {msg['healing_score']}/10)")
-        
-        if not conversation_data:
-            return None
-        
-        context_description = self._get_context_description(context)
-        
-        prompt = f"""Analyze conversation patterns for a {context_description} relationship with {contact_name}.
-
-RECENT CONVERSATIONS:
-{chr(10).join(conversation_data)}
-
-Provide insights in this format:
-
-**📈 PROGRESS TRENDS**
-How communication is evolving (1-2 sentences)
-
-**🎯 KEY THEMES** 
-Main topics and patterns (1-2 sentences)
-
-**💡 RECOMMENDATIONS**
-Specific advice for continued healing (2-3 suggestions)
-
-Focus on growth, patterns, and actionable next steps."""
-
-        return prompt
-    
-    def _build_relationship_context(self, history: Optional[List[Dict]], 
-                                  for_interpretation: bool = False) -> str:
-        """Build relationship context from conversation history"""
-        
-        if not history or len(history) < 2:
-            return "RELATIONSHIP STATUS: Early conversations - building understanding"
-        
-        # Analyze recent patterns
-        recent_messages = history[-5:] if len(history) >= 5 else history
-        patterns = []
-        
-        # Healing score trend
-        scores = [msg.get('healing_score', 0) for msg in recent_messages if msg.get('healing_score')]
-        if scores:
-            avg_score = sum(scores) / len(scores)
-            trend = "improving" if len(scores) > 1 and scores[-1] > scores[0] else "stable"
-            patterns.append(f"Healing trend: {trend} (avg: {avg_score:.1f}/10)")
-        
-        # Recent interaction samples (for interpretation mode)
-        if for_interpretation and len(history) >= 3:
-            recent_samples = []
-            for msg in history[-3:]:
-                if msg.get('original'):
-                    recent_samples.append(f"Previous: '{msg['original'][:40]}...'")
-            if recent_samples:
-                patterns.extend(recent_samples)
-        
-        # Conversation frequency
-        total_conversations = len(history)
-        patterns.append(f"Total conversations: {total_conversations}")
-        
-        if patterns:
-            return f"RELATIONSHIP CONTEXT:\n" + "\n".join(f"- {pattern}" for pattern in patterns)
-        else:
-            return "RELATIONSHIP CONTEXT: Limited history available"
-    
-    def _get_context_description(self, context: str) -> str:
-        """Get human-readable description of relationship context"""
-        
-        context_descriptions = {
-            "romantic": "romantic/intimate partnership",
-            "coparenting": "co-parenting relationship",
-            "workplace": "professional/workplace relationship", 
-            "family": "family relationship",
-            "friend": "friendship"
-        }
-        
-        return context_descriptions.get(context, f"{context} relationship")
-    
-    def get_healing_score_explanation(self, score: int) -> str:
-        """Get explanation for healing scores"""
-        
-        explanations = {
-            10: "🌟 Perfect - Maximum healing potential, deeply transformative",
-            9: "✨ Excellent - Very high healing potential, strong connection builder",
-            8: "🌱 Great - High healing potential, clear relationship improvement",
-            7: "💚 Good - Solid healing approach, positive relationship impact",
-            6: "💛 Fair - Decent guidance with room for more healing focus",
-            5: "🔧 Basic - Standard response, minimal healing enhancement",
-            4: "⚠️ Below Average - Limited healing potential, needs improvement",
-            3: "🔴 Poor - Low healing value, may not help much",
-            2: "❌ Bad - Very limited benefit, likely ineffective",
-            1: "💔 Terrible - No healing value, potentially harmful"
-        }
-        
-        return explanations.get(score, f"Score: {score}/10")
-    
-    def get_context_specific_tips(self, context: str) -> List[str]:
-        """Get relationship-specific communication tips"""
-        
-        tips = {
-            "romantic": [
-                "Use 'I feel' statements instead of 'You always/never'",
-                "Address the need behind the emotion",
-                "Focus on solving together, not winning",
-                "Physical affection can help during difficult conversations"
-            ],
-            "coparenting": [
-                "Keep focus on the children's wellbeing",
-                "Separate your hurt from parenting decisions", 
-                "Use business-like tone when emotions are high",
-                "Remember: you're teammates for your kids' sake"
-            ],
-            "workplace": [
-                "Maintain professional boundaries while being human",
-                "Focus on work impact rather than personal feelings",
-                "Seek win-win solutions that benefit the team",
-                "Document important conversations professionally"
-            ],
-            "family": [
-                "Honor family history while setting healthy boundaries",
-                "Respect generational differences in communication styles",
-                "Focus on love beneath family dysfunction patterns",
-                "Remember: you can't change them, only your response"
-            ],
-            "friend": [
-                "Friendships require mutual effort and understanding",
-                "Address conflicts directly but gently",
-                "Allow space for different life phases and priorities",
-                "True friends want the best for each other"
-            ]
-        }
-        
-        return tips.get(context, [
-            "Listen to understand, not to respond",
-            "Speak from love, even when you're hurt",
-            "Focus on healing the relationship, not being right",
-            "Take breaks when emotions get too intense"
-        ])
-    
-    def get_emergency_prompts(self) -> Dict[str, str]:
-        """Get prompts for crisis/emergency situations"""
-        
-        return {
-            "crisis_detection": """Analyze this message for signs of crisis (suicide ideation, domestic violence, severe mental health crisis, threats of harm):
-
-MESSAGE: "{message}"
-
-If you detect ANY crisis indicators, respond with:
-CRISIS: YES - [brief explanation]
-RESOURCES: [appropriate crisis resources]
-
-If no crisis detected:
-CRISIS: NO
-
-Be extremely cautious - err on the side of safety.""",
+        Args:
+            contact_name: Name of the contact
+            context: Relationship context (e.g., family, romantic)
+            message: Input message
+            history: Conversation history
+            is_incoming: Whether the message is incoming (True) or outgoing (False)
             
-            "safety_first": """This message may indicate a safety concern. Your response should:
-1. Prioritize safety over relationship healing
-2. Suggest professional help resources
-3. Avoid giving advice that could escalate danger
-4. Be supportive but clear about limitations
-
-Remember: Some situations require professional intervention, not AI guidance."""
+        Returns:
+            System prompt string
+        """
+        logger = st.get_logger(__name__)
+        context_keywords = {
+            "family": "trust, support, family roles, emotional safety, togetherness",
+            "romantic": "intimacy, partnership, vulnerability, affection",
+            "coparenting": "cooperation, parenting, respect, shared responsibility",
+            "workplace": "professionalism, collaboration, clarity, teamwork",
+            "friend": "loyalty, fun, mutual support, camaraderie"
         }
+        
+        base_prompt = f"""
+        You are The Third Voice AI, a compassionate assistant helping users communicate with love and understanding in their relationships. Your role is to transform messages to promote healing, empathy, and connection, especially in emotionally charged situations. You are assisting with a {context} relationship for a contact named {contact_name}. Use a warm, supportive tone and emphasize {context_keywords.get(context, 'empathy, connection')} to tailor the response.
 
-# Create global instance
-prompt_manager = PromptManager()
+        Instructions:
+        - For incoming messages (from {contact_name} to the user):
+          - Rephrase the message to soften its tone, clarify intent, and suggest a loving, constructive response the user can give.
+          - Acknowledge the emotions behind {contact_name}'s words and offer a perspective that fosters understanding.
+        - For outgoing messages (from the user to {contact_name}):
+          - Coach the user to express their feelings in a way that is kind, clear, and promotes healing.
+          - Avoid blame or defensiveness; use 'I' statements and empathy.
+        - Consider the {context} relationship dynamics (e.g., {context_keywords.get(context, 'empathy, connection')} for a {context} context).
+        - If history is provided, incorporate emotional patterns or recurring themes to make the response more relevant.
+        - Keep responses concise (100-200 words), empathetic, and actionable.
+        - Avoid generic responses; tailor the tone and content to the specific message and context.
+        - If the message is ambiguous, infer likely emotions based on the {context} context.
 
-# Convenience functions for easy import
-def get_transformation_prompt(*args, **kwargs):
-    return prompt_manager.get_transformation_prompt(*args, **kwargs)
+        Current message: {message}
+        """
 
-def get_interpretation_prompt(*args, **kwargs):
-    return prompt_manager.get_interpretation_prompt(*args, **kwargs)
+        if history and len(history) > 0:
+            recent_history = history[-3:]  # Last 3 messages for context
+            history_summary = "\nRecent conversation history:\n"
+            for msg in recent_history:
+                history_summary += f"- {msg['time']}: {msg['original'][:200]}... (Type: {msg['type']}, Healing Score: {msg.get('healing_score', 'N/A')}, Sentiment: {msg.get('sentiment', 'N/A')})\n"
+            base_prompt += history_summary
+            base_prompt += "\nUse this history to identify emotional patterns (e.g., frustration, support) and tailor your response accordingly."
+        else:
+            base_prompt += "\nNo conversation history is available. Focus on the current message and {context} context to provide a relevant response."
 
-def get_healing_score_explanation(score: int):
-    return prompt_manager.get_healing_score_explanation(score)
+        if is_incoming:
+            base_prompt += f"""
+            This is an incoming message from {contact_name}. Rephrase their message to highlight the underlying emotions and suggest a response that fosters connection and understanding in the {context} context.
+            """
+        else:
+            base_prompt += f"""
+            This is an outgoing message from the user to {contact_name}. Coach the user to rephrase their message in a way that promotes healing and empathy in the {context} context.
+            """
 
-def get_context_tips(context: str):
-    return prompt_manager.get_context_specific_tips(context)
+        logger.debug(f"Generated transformation prompt for {contact_name}, context: {context}, length: {len(base_prompt)}")
+        return base_prompt
+
+    @staticmethod
+    def get_interpretation_prompt(
+        contact_name: str,
+        context: str,
+        message: str,
+        history: Optional[List[Dict]] = None
+    ) -> str:
+        """
+        Generate system prompt for message interpretation
+        
+        Args:
+            contact_name: Name of the contact
+            context: Relationship context
+            message: Message to interpret
+            history: Conversation history
+            
+        Returns:
+            System prompt string
+        """
+        logger = st.get_logger(__name__)
+        context_keywords = {
+            "family": "trust, support, family roles, emotional safety, togetherness",
+            "romantic": "intimacy, partnership, vulnerability, affection",
+            "coparenting": "cooperation, parenting, respect, shared responsibility",
+            "workplace": "professionalism, collaboration, clarity, teamwork",
+            "friend": "loyalty, fun, mutual support, camaraderie"
+        }
+        
+        prompt = f"""
+        You are The Third Voice AI, a compassionate assistant analyzing emotional subtext in messages to help users understand their relationships. Your role is to interpret the message below from {contact_name} in a {context} relationship, identifying underlying emotions, unmet needs, and opportunities for healing. Use a warm, empathetic tone to make the user feel supported, and emphasize {context_keywords.get(context, 'empathy, connection')} to tailor the response.
+
+        Instructions:
+        - Analyze the emotional subtext of the message (e.g., frustration, longing, appreciation).
+        - Identify unmet needs or desires {contact_name} may be expressing (e.g., respect, acknowledgment).
+        - Suggest specific, actionable ways the user can respond to foster healing and connection.
+        - Highlight potential pitfalls to avoid (e.g., defensive responses, dismissing feelings).
+        - Structure the response with clear sections:
+          - **🎭 EMOTIONAL SUBTEXT**: What emotions or intentions are beneath the words?
+          - **💔 UNMET NEEDS**: What does {contact_name} need based on this message?
+          - **🌱 HEALING OPPORTUNITIES**: How can the user respond to promote understanding?
+          - **⚠️ WATCH FOR**: What to avoid to prevent escalation?
+        - Keep the response concise (150-250 words) and tailored to the {context} context.
+        - If history is provided, use it to identify recurring emotional patterns.
+
+        Message to analyze: {message}
+        """
+
+        if history and len(history) > 0:
+            recent_history = history[-3:]  # Last 3 messages for context
+            history_summary = "\nRecent conversation history:\n"
+            for msg in recent_history:
+                history_summary += f"- {msg['time']}: {msg['original'][:200]}... (Type: {msg['type']}, Healing Score: {msg.get('healing_score', 'N/A')}, Sentiment: {msg.get('sentiment', 'N/A')})\n"
+            prompt += history_summary
+            prompt += "\nUse this history to contextualize the emotional subtext and tailor your analysis."
+        else:
+            prompt += "\nNo conversation history is available. Focus on the current message and {context} context to provide a relevant analysis."
+
+        logger.debug(f"Generated interpretation prompt for {contact_name}, context: {context}, length: {len(prompt)}")
+        return prompt
+
+    @staticmethod
+    def get_healing_score_explanation(score: int) -> str:
+        """
+        Provide explanation for healing score
+        
+        Args:
+            score: Healing score (0-10)
+            
+        Returns:
+            Explanation string
+        """
+        logger = st.get_logger(__name__)
+        explanations = {
+            range(8, 11): f"{score}/10: High healing potential! This response fosters deep connection and understanding in the relationship.",
+            range(6, 8): f"{score}/10: Good healing potential. This response promotes empathy and constructive dialogue.",
+            range(4, 6): f"{score}/10: Moderate healing potential. This response is a step toward understanding but could be more empathetic.",
+            range(0, 4): f"{score}/10: Limited healing potential. Consider softening the tone or addressing emotions more directly."
+        }
+        
+        for score_range, explanation in explanations.items():
+            if score in score_range:
+                logger.debug(f"Healing score explanation: {explanation}")
+                return explanation
+        return f"{score}/10: Invalid score. Please ensure score is between 0 and 10."
+
+    @staticmethod
+    def get_relationship_health_prompt(
+        contact_name: str,
+        context: str,
+        history: List[Dict]
+    ) -> str:
+        """
+        Generate system prompt for relationship health analysis
+        
+        Args:
+            contact_name: Name of the contact
+            context: Relationship context
+            history: Conversation history
+            
+        Returns:
+            System prompt string
+        """
+        logger = st.get_logger(__name__)
+        context_keywords = {
+            "family": "trust, support, family roles, emotional safety, togetherness",
+            "romantic": "intimacy, partnership, vulnerability, affection",
+            "coparenting": "cooperation, parenting, respect, shared responsibility",
+            "workplace": "professionalism, collaboration, clarity, teamwork",
+            "friend": "loyalty, fun, mutual support, camaraderie"
+        }
+        
+        prompt = f"""
+        You are The Third Voice AI, a compassionate assistant analyzing conversation history to assess the health of a {context} relationship with {contact_name}. Your role is to provide a concise summary of the relationship's emotional health, focusing on {context_keywords.get(context, 'empathy, connection')}. 
+
+        Instructions:
+        - Analyze the provided conversation history to identify patterns (e.g., recurring emotions, communication styles).
+        - Provide a brief assessment (100-150 words) of the relationship's health, including:
+          - **Strengths**: Positive patterns (e.g., empathy, support).
+          - **Challenges**: Areas of tension or unmet needs.
+          - **Recommendations**: Actionable steps to improve the relationship.
+        - Use a warm, encouraging tone to inspire the user to continue their healing journey.
+        - Tailor the analysis to the {context} context.
+
+        Conversation history:
+        """
+        
+        if history and len(history) > 0:
+            recent_history = history[-5:]  # Last 5 messages for context
+            history_summary = "\n"
+            for msg in recent_history:
+                history_summary += f"- {msg['time']}: {msg['original'][:200]}... (Type: {msg['type']}, Healing Score: {msg.get('healing_score', 'N/A')}, Sentiment: {msg.get('sentiment', 'N/A')})\n"
+            prompt += history_summary
+        else:
+            prompt += "\nNo conversation history is available. Provide a general assessment based on the {context} context."
+
+        prompt += "\nBased on this, provide a relationship health assessment."
+        logger.debug(f"Generated relationship health prompt for {contact_name}, context: {context}, length: {len(prompt)}")
+        return prompt
+
+    @staticmethod
+    def get_feedback_analysis_prompt(
+        feedback_text: str,
+        feature_context: str,
+        rating: int
+    ) -> str:
+        """
+        Generate system prompt for analyzing user feedback
+        
+        Args:
+            feedback_text: User-provided feedback
+            feature_context: Feature or context of the feedback
+            rating: Feedback rating (1-5)
+            
+        Returns:
+            System prompt string
+        """
+        logger = st.get_logger(__name__)
+        prompt = f"""
+        You are The Third Voice AI, analyzing user feedback to improve the application. Your role is to interpret the feedback provided below, focusing on the {feature_context} feature, and provide insights to enhance the user experience.
+
+        Instructions:
+        - Analyze the feedback text and rating ({rating}/5) to identify:
+          - **User Sentiment**: Positive, neutral, or negative emotions.
+          - **Key Themes**: Specific praises, criticisms, or suggestions.
+          - **Actionable Improvements**: Practical steps to address the feedback.
+        - Structure the response with:
+          - **📊 SENTIMENT**: What is the user's overall sentiment?
+          - **🔍 KEY THEMES**: What are the main points or concerns?
+          - **🛠️ IMPROVEMENTS**: How can the {feature_context} feature be improved?
+        - Keep the response concise (100-150 words) and actionable.
+        - Use a neutral, professional tone.
+
+        Feedback text: {feedback_text}
+        Rating: {rating}/5
+        """
+        logger.debug(f"Generated feedback analysis prompt for feature: {feature_context}, rating: {rating}")
+        return prompt
