@@ -189,10 +189,7 @@ class StateManager:
     
     def clear_conversation_input(self) -> None:
         """Clear conversation input"""
-        self.update({
-            'conversation_input_text': '',
-            'clear_conversation_input': True
-        })
+        self.set('clear_conversation_input', True)
     
     def should_clear_input(self) -> bool:
         """Check if input should be cleared"""
