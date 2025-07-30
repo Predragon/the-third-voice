@@ -430,6 +430,12 @@ class MainUI:
     @staticmethod
     def _show_input_section(state_manager, data_manager, ai_processor, active_contact: str, context: str, history: list, contact_id: str) -> None:
         """Show message input section"""
+        # Handle input clearing at the start of render
+        if state_manager.should_clear_input():
+            if 'conversation_input_text' in st.session_state:
+                st.session_state.conversation_input_text = ""
+            state_manager.reset_clear_flag()
+
         st.markdown("#### 💭 Your Input")
         st.markdown("*Share what happened - their message or your response that needs guidance*")
         
@@ -460,7 +466,7 @@ class MainUI:
         
         with col3:
             if show_navigation_button("🗑️ Clear", "clear_input_btn"):
-                state_manager.clear_conversation_input()
+                state_manager.set('clear_conversation_input', True)
                 state_manager.clear_error()
                 st.rerun()
         
@@ -491,7 +497,7 @@ class MainUI:
                     model_used=result["model"],
                     sentiment=result["sentiment"]
                 )
-                state_manager.clear_conversation_input()
+                state_manager.set('clear_conversation_input', True)
                 st.rerun()
             else:
                 display_error(result["error"])
