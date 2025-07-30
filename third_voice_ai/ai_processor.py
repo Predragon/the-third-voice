@@ -49,8 +49,10 @@ class AIProcessor:
         Returns:
             API response dictionary
         """
+        logger = st.get_logger(__name__)
         api_key = self._get_api_key()
         if not api_key:
+            logger.error("No OpenRouter API key found in secrets")
             return {"error": ERROR_MESSAGES["no_api_key"], "success": False}
         
         headers = {
@@ -66,26 +68,34 @@ class AIProcessor:
         }
         
         try:
+            logger.debug(f"Sending API request: model={self.model}, messages={messages[:100]}...")
             response = requests.post(self.api_url, headers=headers, json=payload, timeout=self.timeout)
             response.raise_for_status()
             response_json = response.json()
             
             if "choices" in response_json and len(response_json["choices"]) > 0:
-                return {
+                result = {
                     "response": response_json["choices"][0]["message"]["content"].strip(),
                     "model": self.model,
                     "success": True
                 }
+                logger.info(f"API request successful: response_length={len(result['response'])}")
+                return result
             else:
+                logger.error(f"API response missing 'choices': {response_json}")
                 return {"error": f"API response missing 'choices': {response_json}", "success": False}
                 
         except requests.exceptions.Timeout:
+            logger.error(f"API request timed out after {self.timeout} seconds")
             return {"error": ERROR_MESSAGES["network_timeout"], "success": False}
         except requests.exceptions.ConnectionError:
+            logger.error("API request failed due to connection error")
             return {"error": ERROR_MESSAGES["connection_error"], "success": False}
         except requests.exceptions.RequestException as e:
+            logger.error(f"API request failed: {str(e)}")
             return {"error": f"Network error: {e}", "success": False}
         except Exception as e:
+            logger.exception(f"Unexpected error in API request: {str(e)}")
             return {"error": f"Unexpected error: {e}", "success": False}
     
     def process_message(self, contact_name: str, message: str, context: str, history: List[Dict] = None, is_incoming: bool = False) -> Dict[str, Any]:
@@ -106,10 +116,12 @@ class AIProcessor:
         logger = st.get_logger(__name__)
         
         if not message.strip():
+            logger.warning("Empty message provided")
             return {"error": ERROR_MESSAGES["empty_message"], "success": False}
         
         # Determine message type
         message_type = utils.detect_message_type(message)
+        logger.debug(f"Detected message type: {message_type}, is_incoming: {is_incoming}")
         
         # Check cache first
         message_hash = utils.create_message_hash(message, context)
@@ -133,6 +145,7 @@ class AIProcessor:
         
         # Generate new response
         system_prompt = get_transformation_prompt(contact_name, context, message, history, is_incoming)
+        logger.debug(f"Transformation prompt: {system_prompt[:200]}...")
         
         messages = [
             {"role": "system", "content": system_prompt},
@@ -188,16 +201,18 @@ class AIProcessor:
         logger = st.get_logger(__name__)
         
         if not message.strip():
+            logger.warning("Empty message provided for interpretation")
             return {"error": ERROR_MESSAGES["empty_message"], "success": False}
         
         system_prompt = get_interpretation_prompt(contact_name, context, message, history)
+        logger.debug(f"Interpretation prompt: {system_prompt[:200]}...")
         
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": f"Analyze this message: {message}"}
         ]
         
-        result = self._make_api_request(messages, temperature=0.6, max_tokens=400)
+        result = self._make_api_request(messages, temperature=0.8, max_tokens=400)
         
         if result["success"]:
             # Calculate interpretation score
@@ -212,7 +227,7 @@ class AIProcessor:
                 interpretation_score += 2
             interpretation_score = min(10, interpretation_score)
             
-            logger.info(f"Generated interpretation for {contact_name}, score: {interpretation_score}")
+            logger.info(f"Generated interpretation for {contact_name}, score: {interpretation_score}, response_length: {len(interpretation)}")
             return {
                 "interpretation": interpretation,
                 "interpretation_score": interpretation_score,
@@ -233,17 +248,21 @@ class AIProcessor:
         Returns:
             Tuple of (health_score, status_description)
         """
+        logger = st.get_logger(__name__)
         if not history:
+            logger.debug("No history provided for health score calculation")
             return 0.0, "No data yet"
         
         recent_scores = [msg.get('healing_score', 0) for msg in history[-10:] if msg.get('healing_score')]
         
         if not recent_scores:
+            logger.debug("No scored conversations in history")
             return 0.0, "No scored conversations yet"
         
         avg_score = sum(recent_scores) / len(recent_scores)
         status = utils.get_relationship_health_status(avg_score)
         
+        logger.debug(f"Calculated health score: {avg_score}, status: {status}")
         return round(avg_score, 1), status
     
     def get_healing_insights(self, history: List[Dict]) -> List[str]:
@@ -256,7 +275,9 @@ class AIProcessor:
         Returns:
             List of insight strings
         """
+        logger = st.get_logger(__name__)
         if not history or len(history) < 3:
+            logger.debug("Insufficient history for insights")
             return ["🌱 You're just getting started! Every conversation is a step toward healing."]
         
         insights = []
@@ -283,6 +304,7 @@ class AIProcessor:
         if scores and max(scores[-5:]) < 6:
             insights.append("🤗 Remember: every family faces challenges. You're here working on it - that matters.")
         
+        logger.debug(f"Generated insights: {insights}")
         return insights if insights else ["💙 Keep going - healing happens one conversation at a time."]
 
 # Global AI processor instance
