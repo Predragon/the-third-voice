@@ -71,7 +71,9 @@ the-third-voice/
 | **Resend.com**| Email verification with secure onboarding flow  |
 | **Redmi Phone**| Yes — built entirely using **Termux** and **QuickEdit** on a mobile device |
 
----
+> ### 🌐 The Third Voice  
+> Our narrative, design philosophy, and demo are featured at [**www.thethirdvoice.ai**](https://www.thethirdvoice.ai)  
+> This companion landing page is published via [GitHub Pages](https://github.com/Predragon/Landing-thethirdvoice.ai) for storytelling, onboarding, and open-source resonance.
 
 ## ✨ Why It Matters
 
