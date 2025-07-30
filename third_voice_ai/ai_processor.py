@@ -9,6 +9,7 @@ from .config import API_URL, MODEL, DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS, API
 from .utils import utils
 from .auth_manager import auth_manager
 from .data_manager import data_manager
+from .prompts import get_transformation_prompt, get_interpretation_prompt, get_healing_score_explanation
 
 class AIProcessor:
     """
@@ -66,6 +67,7 @@ class AIProcessor:
         
         try:
             response = requests.post(self.api_url, headers=headers, json=payload, timeout=self.timeout)
+            response.raise_for_status()
             response_json = response.json()
             
             if "choices" in response_json and len(response_json["choices"]) > 0:
@@ -86,92 +88,7 @@ class AIProcessor:
         except Exception as e:
             return {"error": f"Unexpected error: {e}", "success": False}
     
-    def get_enhanced_system_prompt(self, contact_name: str, context: str, message: str, history: List[Dict] = None) -> str:
-        """
-        Build relationship-aware prompts with conversation memory
-        
-        Args:
-            contact_name: Name of the contact
-            context: Relationship context
-            message: Current message
-            history: Conversation history
-            
-        Returns:
-            Enhanced system prompt
-        """
-        base_prompt = f"You are a compassionate relationship guide helping with a {context} relationship with {contact_name}."
-        
-        if not history or len(history) < 2:
-            return base_prompt + " This is an early conversation, so focus on building understanding."
-        
-        # Add relationship context
-        patterns = self.analyze_conversation_patterns(history)
-        themes = self.identify_recurring_themes(history)
-        
-        relationship_context = f"""
-RELATIONSHIP INSIGHTS:
-- Conversation patterns: {patterns}
-- Recurring themes: {themes}
-- Total conversations: {len(history)}
-
-Consider this relationship history when providing guidance. Reference patterns where helpful, but don't overwhelm with past details."""
-        
-        return base_prompt + relationship_context
-    
-    def analyze_conversation_patterns(self, history: List[Dict]) -> str:
-        """
-        Identify patterns in conversation history
-        
-        Args:
-            history: Conversation history
-            
-        Returns:
-            Pattern analysis string
-        """
-        if not history or len(history) < 3:
-            return "Limited history available"
-        
-        # Analyze healing score trends
-        recent_scores = [msg.get('healing_score', 0) for msg in history[-5:] if msg.get('healing_score')]
-        if recent_scores:
-            avg_score = sum(recent_scores) / len(recent_scores)
-            trend = "improving" if len(recent_scores) > 1 and recent_scores[-1] > recent_scores[0] else "stable"
-            return f"Healing trend: {trend} (avg: {avg_score:.1f}/10)"
-        
-        return "Building relationship understanding..."
-    
-    def identify_recurring_themes(self, history: List[Dict]) -> str:
-        """
-        Find recurring issues and communication patterns
-        
-        Args:
-            history: Conversation history
-            
-        Returns:
-            Themes analysis string
-        """
-        if not history or len(history) < 2:
-            return "New relationship - learning patterns"
-        
-        # Simple keyword analysis for common themes
-        all_messages = " ".join([msg.get('original', '').lower() for msg in history])
-        
-        themes = []
-        theme_keywords = {
-            "communication": ["listen", "understand", "hear", "talk"],
-            "respect": ["respect", "appreciate", "value", "disrespect"],
-            "time": ["time", "busy", "schedule", "priority"],
-            "emotions": ["feel", "hurt", "angry", "sad", "frustrated"],
-            "trust": ["trust", "honest", "lie", "truth"]
-        }
-        
-        for theme, keywords in theme_keywords.items():
-            if sum(word in all_messages for word in keywords) >= 2:
-                themes.append(theme)
-        
-        return ", ".join(themes) if themes else "Varied conversation topics"
-    
-    def process_message(self, contact_name: str, message: str, context: str, history: List[Dict] = None) -> Dict[str, Any]:
+    def process_message(self, contact_name: str, message: str, context: str, history: List[Dict] = None, is_incoming: bool = False) -> Dict[str, Any]:
         """
         Process a message with AI guidance
         
@@ -180,10 +97,14 @@ Consider this relationship history when providing guidance. Reference patterns w
             message: Message to process
             context: Relationship context
             history: Conversation history
+            is_incoming: Whether the message is incoming (translate) or outgoing (coach)
             
         Returns:
             Processing result dictionary
         """
+        from .state_manager import state_manager
+        logger = st.get_logger(__name__)
+        
         if not message.strip():
             return {"error": ERROR_MESSAGES["empty_message"], "success": False}
         
@@ -192,15 +113,13 @@ Consider this relationship history when providing guidance. Reference patterns w
         
         # Check cache first
         message_hash = utils.create_message_hash(message, context)
-        
-        # Get contact data
-        from .state_manager import state_manager
         contact_data = state_manager.get_contact_data(contact_name)
         contact_id = contact_data.get("id")
         
         if contact_id:
             cached_response = data_manager.get_cached_ai_response(contact_id, message_hash)
             if cached_response:
+                logger.info(f"Returning cached response for {contact_name}, hash: {message_hash}")
                 return {
                     "response": cached_response["response"],
                     "healing_score": cached_response["healing_score"],
@@ -213,14 +132,7 @@ Consider this relationship history when providing guidance. Reference patterns w
                 }
         
         # Generate new response
-        system_prompt = self.get_enhanced_system_prompt(contact_name, context, message, history)
-        
-        if message_type == "translate":
-            system_prompt += " Understand what they mean and suggest a loving response."
-        else:
-            system_prompt += " Reframe their message to be constructive and loving."
-        
-        system_prompt += " Keep it concise, insightful, and actionable (2-3 paragraphs)."
+        system_prompt = get_transformation_prompt(contact_name, context, message, history, is_incoming)
         
         messages = [
             {"role": "system", "content": system_prompt},
@@ -244,6 +156,7 @@ Consider this relationship history when providing guidance. Reference patterns w
                     healing_score, result["model"], sentiment, emotional_state
                 )
             
+            logger.info(f"Generated new response for {contact_name}, healing_score: {healing_score}")
             return {
                 "response": result["response"],
                 "healing_score": healing_score,
@@ -255,6 +168,7 @@ Consider this relationship history when providing guidance. Reference patterns w
                 "success": True
             }
         else:
+            logger.error(f"AI processing failed for {contact_name}: {result['error']}")
             return result
     
     def interpret_message(self, contact_name: str, message: str, context: str, history: List[Dict] = None) -> Dict[str, Any]:
@@ -270,42 +184,14 @@ Consider this relationship history when providing guidance. Reference patterns w
         Returns:
             Interpretation result dictionary
         """
+        from .state_manager import state_manager
+        logger = st.get_logger(__name__)
+        
         if not message.strip():
             return {"error": ERROR_MESSAGES["empty_message"], "success": False}
         
-        # Build relationship context from history
-        relationship_context = ""
-        if history:
-            recent_messages = history[-5:]  # Last 5 interactions
-            patterns = []
-            for msg in recent_messages:
-                if msg.get('original') and msg.get('healing_score'):
-                    patterns.append(f"Previous: '{msg['original'][:50]}...' (Score: {msg['healing_score']}/10)")
-            
-            if patterns:
-                relationship_context = f"\nRELATIONSHIP CONTEXT:\n" + "\n".join(patterns[-3:])
+        system_prompt = get_interpretation_prompt(contact_name, context, message, history)
         
-        system_prompt = f"""You are an expert relationship therapist analyzing emotional subtext with deep compassion.
-
-For this {context} relationship message from {contact_name}: "{message}"
-{relationship_context}
-
-Provide insights in exactly this format:
-
-**🎭 EMOTIONAL SUBTEXT**
-What they're really feeling beneath the words (1-2 sentences)
-
-**💔 UNMET NEEDS** 
-What they actually need but can't express (1-2 sentences)
-
-**🌱 HEALING OPPORTUNITIES**
-Specific ways to address their deeper needs (2-3 actionable suggestions)
-
-**⚠️ WATCH FOR**
-Relationship patterns or warning signs (1 sentence)
-
-Be direct but loving. This person is trying to heal their family."""
-
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": f"Analyze this message: {message}"}
@@ -314,7 +200,7 @@ Be direct but loving. This person is trying to heal their family."""
         result = self._make_api_request(messages, temperature=0.6, max_tokens=400)
         
         if result["success"]:
-            # Calculate interpretation score (how revealing/useful)
+            # Calculate interpretation score
             interpretation_score = 5
             interpretation = result["response"]
             
@@ -326,6 +212,7 @@ Be direct but loving. This person is trying to heal their family."""
                 interpretation_score += 2
             interpretation_score = min(10, interpretation_score)
             
+            logger.info(f"Generated interpretation for {contact_name}, score: {interpretation_score}")
             return {
                 "interpretation": interpretation,
                 "interpretation_score": interpretation_score,
@@ -333,6 +220,7 @@ Be direct but loving. This person is trying to heal their family."""
                 "success": True
             }
         else:
+            logger.error(f"Interpretation failed for {contact_name}: {result['error']}")
             return result
     
     def calculate_relationship_health_score(self, history: List[Dict]) -> tuple[float, str]:
@@ -348,7 +236,6 @@ Be direct but loving. This person is trying to heal their family."""
         if not history:
             return 0.0, "No data yet"
         
-        # Get healing scores from last 10 conversations
         recent_scores = [msg.get('healing_score', 0) for msg in history[-10:] if msg.get('healing_score')]
         
         if not recent_scores:
@@ -374,7 +261,6 @@ Be direct but loving. This person is trying to heal their family."""
         
         insights = []
         
-        # Score trend analysis
         scores = [msg.get('healing_score', 0) for msg in history if msg.get('healing_score')]
         if len(scores) >= 5:
             recent_avg = sum(scores[-5:]) / 5
@@ -383,20 +269,17 @@ Be direct but loving. This person is trying to heal their family."""
             if recent_avg > older_avg + 0.5:
                 insights.append("📈 Your communication is improving! Recent conversations show higher healing scores.")
             elif recent_avg < older_avg - 0.5:
-                insights.append("💪 Having some challenges lately? That's normal - healing isn't always linear.")
+                insights.append("💪 Having some challenges lately? That's normal - healing isn't linear.")
         
-        # High score celebrations
         high_scores = [score for score in scores if score >= 8]
         if len(high_scores) >= 3:
             insights.append(f"🌟 Amazing! You've had {len(high_scores)} conversations with healing scores of 8+!")
         
-        # Consistency insights  
         if len(scores) >= 7:
             consistency = len([s for s in scores[-7:] if s >= 6]) / 7
             if consistency >= 0.7:
                 insights.append("🎯 You're building consistent healthy communication patterns!")
         
-        # Encourage if struggling
         if scores and max(scores[-5:]) < 6:
             insights.append("🤗 Remember: every family faces challenges. You're here working on it - that matters.")
         
