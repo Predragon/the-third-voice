@@ -114,10 +114,10 @@ class PromptManager:
         - Suggest specific, actionable ways the user can respond to foster healing and connection.
         - Highlight potential pitfalls to avoid (e.g., defensive responses, dismissing feelings).
         - Structure the response with clear sections:
-          - **ЁЯОн EMOTIONAL SUBTEXT**: What emotions or intentions are beneath the words?
-          - **ЁЯТФ UNMET NEEDS**: What does {contact_name} need based on this message?
-          - **ЁЯМ▒ HEALING OPPORTUNITIES**: How can the user respond to promote understanding?
-          - **тЪая╕П WATCH FOR**: What to avoid to prevent escalation?
+          - **🎭 EMOTIONAL SUBTEXT**: What emotions or intentions are beneath the words?
+          - **💔 UNMET NEEDS**: What does {contact_name} need based on this message?
+          - **🌱 HEALING OPPORTUNITIES**: How can the user respond to promote understanding?
+          - **⚠️ WATCH FOR**: What to avoid to prevent escalation?
         - Keep the response concise (150-250 words) and tailored to the {context} context.
         - If history is provided, use it to identify recurring emotional patterns.
 
@@ -243,9 +243,9 @@ class PromptManager:
           - **Key Themes**: Specific praises, criticisms, or suggestions.
           - **Actionable Improvements**: Practical steps to address the feedback.
         - Structure the response with:
-          - **ЁЯУК SENTIMENT**: What is the user's overall sentiment?
-          - **ЁЯФН KEY THEMES**: What are the main points or concerns?
-          - **ЁЯЫая╕П IMPROVEMENTS**: How can the {feature_context} feature be improved?
+          - **📊 SENTIMENT**: What is the user's overall sentiment?
+          - **🔍 KEY THEMES**: What are the main points or concerns?
+          - **🛠️ IMPROVEMENTS**: How can the {feature_context} feature be improved?
         - Keep the response concise (100-150 words) and actionable.
         - Use a neutral, professional tone.
 
@@ -254,3 +254,27 @@ class PromptManager:
         """
         logger.debug(f"Generated feedback analysis prompt for feature: {feature_context}, rating: {rating}")
         return prompt
+
+# Global prompt manager instance
+prompt_manager = PromptManager()
+
+# Standalone functions for backward compatibility
+def get_transformation_prompt(*args, **kwargs):
+    """Backward compatibility wrapper"""
+    return PromptManager.get_transformation_prompt(*args, **kwargs)
+
+def get_interpretation_prompt(*args, **kwargs):
+    """Backward compatibility wrapper"""
+    return PromptManager.get_interpretation_prompt(*args, **kwargs)
+
+def get_healing_score_explanation(*args, **kwargs):
+    """Backward compatibility wrapper"""
+    return PromptManager.get_healing_score_explanation(*args, **kwargs)
+
+def get_relationship_health_prompt(*args, **kwargs):
+    """Backward compatibility wrapper"""
+    return PromptManager.get_relationship_health_prompt(*args, **kwargs)
+
+def get_feedback_analysis_prompt(*args, **kwargs):
+    """Backward compatibility wrapper"""
+    return PromptManager.get_feedback_analysis_prompt(*args, **kwargs)
