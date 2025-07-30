@@ -706,3 +706,16 @@ class MainUI:
         """Handle contact deletion"""
         try:
             if data_manager.delete_contact(edit_contact['id'], edit_contact['name']):
+                contacts = data_manager.load_contacts_and_history()
+                state_manager.set_contacts(contacts)
+                state_manager.set_active_contact(None) # Clear active contact as it's deleted
+                display_success(f"Deleted contact: {edit_contact['name']}")
+                state_manager.navigate_to("contacts_list")
+                state_manager.set_edit_contact(None)
+                st.rerun()
+            else:
+                display_error("Failed to delete contact.")
+        except Exception as e:
+            logger.error(f"Error deleting contact: {str(e)}")
+            display_error("Failed to delete contact. Please try again.")
+
