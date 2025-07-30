@@ -9,7 +9,7 @@ from .config import API_URL, MODEL, DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS, API
 from .utils import utils
 from .auth_manager import auth_manager
 from .data_manager import data_manager
-from .prompts import PromptManager  # Fixed import
+from .prompts import get_transformation_prompt, get_interpretation_prompt  # Using standalone functions
 
 class AIProcessor:
     """
@@ -144,7 +144,7 @@ class AIProcessor:
                 }
         
         # Generate new response
-        system_prompt = PromptManager.get_transformation_prompt(contact_name, context, message, history, is_incoming)  # Fixed function call
+        system_prompt = get_transformation_prompt(contact_name, context, message, history, is_incoming)
         logger.debug(f"Transformation prompt: {system_prompt[:200]}...")
         
         messages = [
@@ -204,7 +204,7 @@ class AIProcessor:
             logger.warning("Empty message provided for interpretation")
             return {"error": ERROR_MESSAGES["empty_message"], "success": False}
         
-        system_prompt = PromptManager.get_interpretation_prompt(contact_name, context, message, history)  # Fixed function call
+        system_prompt = get_interpretation_prompt(contact_name, context, message, history)
         logger.debug(f"Interpretation prompt: {system_prompt[:200]}...")
         
         messages = [
