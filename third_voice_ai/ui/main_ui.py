@@ -11,6 +11,7 @@ from .components import (
     create_metric_card
 )
 from ..config import CONTEXTS, ENABLE_ANALYTICS, ENABLE_INTERPRETATION, ERROR_MESSAGES
+from loguru import logger
 
 
 class MainUI:
@@ -424,7 +425,6 @@ class MainUI:
                     create_metric_card("Total Conversations", len(history))
                 st.markdown(f"**Status:** {status}")
         except Exception as e:
-            from loguru import logger
             logger.error(f"Error calculating relationship health: {str(e)}")
     
     @staticmethod
@@ -476,17 +476,25 @@ class MainUI:
     @staticmethod
     def _process_transform_message(state_manager, data_manager, ai_processor, active_contact: str, context: str, history: list, contact_id: str, message: str) -> None:
         """Process transform message request"""
+        logger.debug(f"Processing transform message for contact: {active_contact}, message: {message[:50]}..., context: {context}, history length: {len(history)}")
         try:
+            # Validate session state
+            debug_info = state_manager.get_debug_info()
+            logger.debug(f"Current session state: {debug_info}")
+
+            # Process message with AI
+            logger.info(f"Calling ai_processor.process_message for {active_contact}")
             result = ai_processor.process_message(
                 contact_name=active_contact,
                 message=message,
                 context=context,
                 history=history
             )
-            
-            if result["success"]:
-                state_manager.set_last_response(active_contact, result)
-                data_manager.save_message(
+            logger.debug(f"AI processor result: {result}")
+
+            if result.get("success", False):
+                logger.info(f"Saving message for contact_id: {contact_id}")
+                save_success = data_manager.save_message(
                     contact_id=contact_id,
                     contact_name=active_contact,
                     message_type=result["message_type"],
@@ -497,13 +505,21 @@ class MainUI:
                     model_used=result["model"],
                     sentiment=result["sentiment"]
                 )
-                state_manager.set('clear_conversation_input', True)
-                st.rerun()
+                
+                if save_success:
+                    state_manager.set_last_response(active_contact, result)
+                    logger.info(f"Message saved successfully, setting clear input flag for {active_contact}")
+                    state_manager.set('clear_conversation_input', True)
+                    st.rerun()
+                else:
+                    logger.error("Failed to save message in data_manager")
+                    display_error("Failed to save message. Please try again.")
             else:
-                display_error(result["error"])
+                error_msg = result.get("error", "Unknown error in AI processing")
+                logger.error(f"AI processor failed: {error_msg}")
+                display_error(error_msg)
         except Exception as e:
-            from loguru import logger
-            logger.error(f"Error processing message: {str(e)}")
+            logger.exception(f"Error processing message for {active_contact}: {str(e)}")
             display_error("Failed to process message. Please try again.")
     
     @staticmethod
@@ -531,7 +547,6 @@ class MainUI:
             else:
                 display_error(result["error"])
         except Exception as e:
-            from loguru import logger
             logger.error(f"Error interpreting message: {str(e)}")
             display_error("Failed to interpret message. Please try again.")
     
@@ -669,7 +684,6 @@ class MainUI:
                 else:
                     display_error("Failed to update contact")
             except Exception as e:
-                from loguru import logger
                 logger.error(f"Error updating contact: {str(e)}")
                 display_error("Failed to update contact. Please try again.")
         else:
@@ -691,6 +705,5 @@ class MainUI:
             else:
                 display_error("Failed to delete contact")
         except Exception as e:
-            from loguru import logger
             logger.error(f"Error deleting contact: {str(e)}")
             display_error("Failed to delete contact. Please try again.")
