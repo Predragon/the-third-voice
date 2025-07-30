@@ -11,7 +11,7 @@ from .components import (
     create_metric_card
 )
 from ..config import CONTEXTS, ENABLE_ANALYTICS, ENABLE_INTERPRETATION, ERROR_MESSAGES
-from ..prompts import get_healing_score_explanation
+from ..prompts import PromptManager  # Fixed import
 from loguru import logger
 
 
@@ -576,7 +576,7 @@ class MainUI:
                 col1, col2 = create_two_column_layout()
                 with col1:
                     score = last_interpretation["interpretation_score"]
-                    st.markdown(f"**Healing Score**: {get_healing_score_explanation(score)}")
+                    st.markdown(f"**Healing Score**: {PromptManager.get_healing_score_explanation(score)}")  # Fixed function call
                 
                 with col2:
                     if show_copy_button("📋 Copy", "copy_interpretation"):
@@ -604,7 +604,7 @@ class MainUI:
                 col_score, col_model, col_copy = create_three_column_layout()
                 with col_score:
                     healing_score = last_response.get("healing_score", 0)
-                    st.markdown(f"**Healing Score**: {get_healing_score_explanation(healing_score)}")
+                    st.markdown(f"**Healing Score**: {PromptManager.get_healing_score_explanation(healing_score)}")  # Fixed function call
                 
                 with col_model:
                     st.caption(f"🤖 Model: {last_response.get('model', 'Unknown')}")
