@@ -1,3 +1,4 @@
+import logging
 # prompts.py - Prompt management for The Third Voice AI
 
 from typing import List, Dict, Optional
@@ -27,7 +28,7 @@ class PromptManager:
         Returns:
             System prompt string
         """
-        logger = st.get_logger(__name__)
+        logger = logging.getLogger(__name__)
         context_keywords = {
             "family": "trust, support, family roles, emotional safety, togetherness",
             "romantic": "intimacy, partnership, vulnerability, affection",
@@ -96,7 +97,7 @@ class PromptManager:
         Returns:
             System prompt string
         """
-        logger = st.get_logger(__name__)
+        logger = logging.getLogger(__name__)
         context_keywords = {
             "family": "trust, support, family roles, emotional safety, togetherness",
             "romantic": "intimacy, partnership, vulnerability, affection",
@@ -148,7 +149,7 @@ class PromptManager:
         Returns:
             Explanation string
         """
-        logger = st.get_logger(__name__)
+        logger = logging.getLogger(__name__)
         explanations = {
             range(8, 11): f"{score}/10: High healing potential! This response fosters deep connection and understanding in the relationship.",
             range(6, 8): f"{score}/10: Good healing potential. This response promotes empathy and constructive dialogue.",
@@ -179,7 +180,7 @@ class PromptManager:
         Returns:
             System prompt string
         """
-        logger = st.get_logger(__name__)
+        logger = logging.getLogger(__name__)
         context_keywords = {
             "family": "trust, support, family roles, emotional safety, togetherness",
             "romantic": "intimacy, partnership, vulnerability, affection",
@@ -233,7 +234,7 @@ class PromptManager:
         Returns:
             System prompt string
         """
-        logger = st.get_logger(__name__)
+        logger = logging.getLogger(__name__)
         prompt = f"""
         You are The Third Voice AI, analyzing user feedback to improve the application. Your role is to interpret the feedback provided below, focusing on the {feature_context} feature, and provide insights to enhance the user experience.
 

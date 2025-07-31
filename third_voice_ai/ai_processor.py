@@ -1,3 +1,5 @@
+import logging
+import logging
 # ai_processor.py - The Third Voice AI Processing Engine
 # OpenRouter integration with mobile-optimized error handling
 
@@ -49,7 +51,7 @@ class AIProcessor:
         Returns:
             API response dictionary
         """
-        logger = st.get_logger(__name__)
+        logger = logging.getLogger(__name__)
         api_key = self._get_api_key()
         if not api_key:
             logger.error("No OpenRouter API key found in secrets")
@@ -113,7 +115,7 @@ class AIProcessor:
             Processing result dictionary
         """
         from .state_manager import state_manager
-        logger = st.get_logger(__name__)
+        logger = logging.getLogger(__name__)
         
         if not message.strip():
             logger.warning("Empty message provided")
@@ -198,7 +200,7 @@ class AIProcessor:
             Interpretation result dictionary
         """
         from .state_manager import state_manager
-        logger = st.get_logger(__name__)
+        logger = logging.getLogger(__name__)
         
         if not message.strip():
             logger.warning("Empty message provided for interpretation")
@@ -248,7 +250,7 @@ class AIProcessor:
         Returns:
             Tuple of (health_score, status_description)
         """
-        logger = st.get_logger(__name__)
+        logger = logging.getLogger(__name__)
         if not history:
             logger.debug("No history provided for health score calculation")
             return 0.0, "No data yet"
@@ -275,7 +277,7 @@ class AIProcessor:
         Returns:
             List of insight strings
         """
-        logger = st.get_logger(__name__)
+        logger = logging.getLogger(__name__)
         if not history or len(history) < 3:
             logger.debug("Insufficient history for insights")
             return ["🌱 You're just getting started! Every conversation is a step toward healing."]
