@@ -1,5 +1,5 @@
 # auth.py - The Third Voice AI Authentication
-# Supabase authentication management with mobile-friendly error handling
+# Supabase authentication management with mobile-friendly error handling and persistent sessions
 
 import streamlit as st
 from supabase import create_client, Client
@@ -10,12 +10,14 @@ from .config import ERROR_MESSAGES
 class AuthManager:
     """
     Authentication manager using Supabase
-    Handles sign up, sign in, sign out with mobile-optimized UX
+    Handles sign up, sign in, sign out with mobile-optimized UX and persistent sessions
     """
     
     def __init__(self):
         """Initialize Supabase client"""
         self.supabase = self._init_supabase()
+        # Try to restore session on initialization
+        self._try_restore_session()
     
     @st.cache_resource
     def _init_supabase(_self) -> Client:
@@ -30,6 +32,64 @@ class AuthManager:
         except Exception as e:
             st.error(f"Failed to connect to Supabase: {e}")
             st.stop()
+    
+    def _try_restore_session(self) -> None:
+        """Try to restore session on app initialization"""
+        try:
+            # Check if we have stored session tokens in browser storage
+            if hasattr(st, 'query_params'):
+                # Get session from URL params if available (for email confirmations)
+                params = st.query_params
+                if 'access_token' in params and 'refresh_token' in params:
+                    try:
+                        self.supabase.auth.set_session(
+                            params['access_token'], 
+                            params['refresh_token']
+                        )
+                        # Clear URL params after setting session
+                        st.query_params.clear()
+                    except Exception as e:
+                        st.warning(f"Could not restore session from URL: {e}")
+            
+            # Try to get existing session
+            session = self.supabase.auth.get_session()
+            if session and session.user:
+                # Session exists, restore authentication state
+                if not state_manager.is_authenticated():
+                    state_manager.set_authenticated(session.user)
+                    
+                    # Import here to avoid circular imports
+                    from .data_manager import data_manager
+                    contacts = data_manager.load_contacts_and_history()
+                    state_manager.set_contacts(contacts)
+                    
+                    if contacts:
+                        state_manager.set_app_mode("contacts_list")
+                    else:
+                        state_manager.set_app_mode("first_time_setup")
+            else:
+                # Try to refresh the session if refresh token exists
+                try:
+                    refreshed_session = self.supabase.auth.refresh_session()
+                    if refreshed_session and refreshed_session.user:
+                        state_manager.set_authenticated(refreshed_session.user)
+                        
+                        from .data_manager import data_manager
+                        contacts = data_manager.load_contacts_and_history()
+                        state_manager.set_contacts(contacts)
+                        
+                        if contacts:
+                            state_manager.set_app_mode("contacts_list")
+                        else:
+                            state_manager.set_app_mode("first_time_setup")
+                except Exception:
+                    # Refresh failed, user needs to log in again
+                    pass
+                    
+        except Exception as e:
+            # Session restoration failed, but don't show error to user
+            # They'll just need to log in again
+            pass
     
     def get_current_user_id(self) -> Optional[str]:
         """Get the current authenticated user's ID"""
@@ -48,6 +108,28 @@ class AuthManager:
         Returns True if session was restored, False otherwise
         """
         try:
+            # First try to refresh the session
+            try:
+                refreshed_session = self.supabase.auth.refresh_session()
+                if refreshed_session and refreshed_session.user:
+                    if not state_manager.is_authenticated():
+                        state_manager.set_authenticated(refreshed_session.user)
+                        
+                        # Import here to avoid circular imports
+                        from .data_manager import data_manager
+                        contacts = data_manager.load_contacts_and_history()
+                        state_manager.set_contacts(contacts)
+                        
+                        if contacts:
+                            state_manager.set_app_mode("contacts_list")
+                        else:
+                            state_manager.set_app_mode("first_time_setup")
+                        
+                        return True
+            except Exception:
+                pass
+            
+            # If refresh failed, try to get existing session
             session = self.supabase.auth.get_session()
             if session and session.user:
                 if not state_manager.is_authenticated():
@@ -66,7 +148,7 @@ class AuthManager:
                     return True
             return False
         except Exception as e:
-            st.warning(f"Could not restore session: {e}")
+            # Don't show error to user, just return False
             return False
     
     def sign_up(self, email: str, password: str) -> bool:
