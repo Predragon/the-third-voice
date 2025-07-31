@@ -1,8 +1,8 @@
-import logging
 # prompts.py - Prompt management for The Third Voice AI
 
 from typing import List, Dict, Optional
 import streamlit as st
+from . import get_logger
 
 class PromptManager:
     """Manages AI prompts for message transformation, interpretation, and relationship analysis"""
@@ -28,7 +28,7 @@ class PromptManager:
         Returns:
             System prompt string
         """
-        logger = logging.getLogger(__name__)
+        logger = get_logger("prompts")
         context_keywords = {
             "family": "trust, support, family roles, emotional safety, togetherness",
             "romantic": "intimacy, partnership, vulnerability, affection",
@@ -97,7 +97,7 @@ class PromptManager:
         Returns:
             System prompt string
         """
-        logger = logging.getLogger(__name__)
+        logger = get_logger("prompts")
         context_keywords = {
             "family": "trust, support, family roles, emotional safety, togetherness",
             "romantic": "intimacy, partnership, vulnerability, affection",
@@ -149,7 +149,7 @@ class PromptManager:
         Returns:
             Explanation string
         """
-        logger = logging.getLogger(__name__)
+        logger = get_logger("prompts")
         explanations = {
             range(8, 11): f"{score}/10: High healing potential! This response fosters deep connection and understanding in the relationship.",
             range(6, 8): f"{score}/10: Good healing potential. This response promotes empathy and constructive dialogue.",
@@ -180,7 +180,7 @@ class PromptManager:
         Returns:
             System prompt string
         """
-        logger = logging.getLogger(__name__)
+        logger = get_logger("prompts")
         context_keywords = {
             "family": "trust, support, family roles, emotional safety, togetherness",
             "romantic": "intimacy, partnership, vulnerability, affection",
@@ -234,7 +234,7 @@ class PromptManager:
         Returns:
             System prompt string
         """
-        logger = logging.getLogger(__name__)
+        logger = get_logger("prompts")
         prompt = f"""
         You are The Third Voice AI, analyzing user feedback to improve the application. Your role is to interpret the feedback provided below, focusing on the {feature_context} feature, and provide insights to enhance the user experience.
 

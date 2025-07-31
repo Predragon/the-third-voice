@@ -16,7 +16,7 @@ import validators
 from passlib.hash import bcrypt
 import pandas as pd
 import numpy as np
-from loguru import logger
+from third_voice_ai import get_logger
 from dateutil.parser import parse
 from dotenv import load_dotenv
 import os
@@ -25,7 +25,7 @@ import os
 load_dotenv()
 
 # Configure logging
-logger.add("app.log", rotation="500 MB")
+logger = get_logger("app")
 
 # Set Streamlit page configuration
 st.set_page_config(

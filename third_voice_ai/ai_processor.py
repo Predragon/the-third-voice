@@ -1,5 +1,3 @@
-import logging
-import logging
 # ai_processor.py - The Third Voice AI Processing Engine
 # OpenRouter integration with mobile-optimized error handling
 
@@ -12,6 +10,7 @@ from .utils import utils
 from .auth_manager import auth_manager
 from .data_manager import data_manager
 from .prompts import get_transformation_prompt, get_interpretation_prompt  # Using standalone functions
+from . import get_logger
 
 class AIProcessor:
     """
@@ -51,10 +50,10 @@ class AIProcessor:
         Returns:
             API response dictionary
         """
-        logger = logging.getLogger(__name__)
+        self.logger = get_logger("ai_processor")
         api_key = self._get_api_key()
         if not api_key:
-            logger.error("No OpenRouter API key found in secrets")
+            self.logger.error("No OpenRouter API key found in secrets")
             return {"error": ERROR_MESSAGES["no_api_key"], "success": False}
         
         headers = {
@@ -70,7 +69,7 @@ class AIProcessor:
         }
         
         try:
-            logger.debug(f"Sending API request: model={self.model}, messages={messages[:100]}...")
+            self.logger.debug(f"Sending API request: model={self.model}, messages={messages[:100]}...")
             response = requests.post(self.api_url, headers=headers, json=payload, timeout=self.timeout)
             response.raise_for_status()
             response_json = response.json()
@@ -81,23 +80,23 @@ class AIProcessor:
                     "model": self.model,
                     "success": True
                 }
-                logger.info(f"API request successful: response_length={len(result['response'])}")
+                self.logger.info(f"API request successful: response_length={len(result['response'])}")
                 return result
             else:
-                logger.error(f"API response missing 'choices': {response_json}")
+                self.logger.error(f"API response missing 'choices': {response_json}")
                 return {"error": f"API response missing 'choices': {response_json}", "success": False}
                 
         except requests.exceptions.Timeout:
-            logger.error(f"API request timed out after {self.timeout} seconds")
+            self.logger.error(f"API request timed out after {self.timeout} seconds")
             return {"error": ERROR_MESSAGES["network_timeout"], "success": False}
         except requests.exceptions.ConnectionError:
-            logger.error("API request failed due to connection error")
+            self.logger.error("API request failed due to connection error")
             return {"error": ERROR_MESSAGES["connection_error"], "success": False}
         except requests.exceptions.RequestException as e:
-            logger.error(f"API request failed: {str(e)}")
+            self.logger.error(f"API request failed: {str(e)}")
             return {"error": f"Network error: {e}", "success": False}
         except Exception as e:
-            logger.exception(f"Unexpected error in API request: {str(e)}")
+            self.logger.exception(f"Unexpected error in API request: {str(e)}")
             return {"error": f"Unexpected error: {e}", "success": False}
     
     def process_message(self, contact_name: str, message: str, context: str, history: List[Dict] = None, is_incoming: bool = False) -> Dict[str, Any]:
@@ -115,15 +114,15 @@ class AIProcessor:
             Processing result dictionary
         """
         from .state_manager import state_manager
-        logger = logging.getLogger(__name__)
+        self.logger = get_logger("ai_processor")
         
         if not message.strip():
-            logger.warning("Empty message provided")
+            self.logger.warning("Empty message provided")
             return {"error": ERROR_MESSAGES["empty_message"], "success": False}
         
         # Determine message type
         message_type = utils.detect_message_type(message)
-        logger.debug(f"Detected message type: {message_type}, is_incoming: {is_incoming}")
+        self.logger.debug(f"Detected message type: {message_type}, is_incoming: {is_incoming}")
         
         # Check cache first
         message_hash = utils.create_message_hash(message, context)
@@ -133,7 +132,7 @@ class AIProcessor:
         if contact_id:
             cached_response = data_manager.get_cached_ai_response(contact_id, message_hash)
             if cached_response:
-                logger.info(f"Returning cached response for {contact_name}, hash: {message_hash}")
+                self.logger.info(f"Returning cached response for {contact_name}, hash: {message_hash}")
                 return {
                     "response": cached_response["response"],
                     "healing_score": cached_response["healing_score"],
@@ -147,7 +146,7 @@ class AIProcessor:
         
         # Generate new response
         system_prompt = get_transformation_prompt(contact_name, context, message, history, is_incoming)
-        logger.debug(f"Transformation prompt: {system_prompt[:200]}...")
+        self.logger.debug(f"Transformation prompt: {system_prompt[:200]}...")
         
         messages = [
             {"role": "system", "content": system_prompt},
@@ -171,7 +170,7 @@ class AIProcessor:
                     healing_score, result["model"], sentiment, emotional_state
                 )
             
-            logger.info(f"Generated new response for {contact_name}, healing_score: {healing_score}")
+            self.logger.info(f"Generated new response for {contact_name}, healing_score: {healing_score}")
             return {
                 "response": result["response"],
                 "healing_score": healing_score,
@@ -183,7 +182,7 @@ class AIProcessor:
                 "success": True
             }
         else:
-            logger.error(f"AI processing failed for {contact_name}: {result['error']}")
+            self.logger.error(f"AI processing failed for {contact_name}: {result['error']}")
             return result
     
     def interpret_message(self, contact_name: str, message: str, context: str, history: List[Dict] = None) -> Dict[str, Any]:
@@ -200,14 +199,14 @@ class AIProcessor:
             Interpretation result dictionary
         """
         from .state_manager import state_manager
-        logger = logging.getLogger(__name__)
+        self.logger = get_logger("ai_processor")
         
         if not message.strip():
-            logger.warning("Empty message provided for interpretation")
+            self.logger.warning("Empty message provided for interpretation")
             return {"error": ERROR_MESSAGES["empty_message"], "success": False}
         
         system_prompt = get_interpretation_prompt(contact_name, context, message, history)
-        logger.debug(f"Interpretation prompt: {system_prompt[:200]}...")
+        self.logger.debug(f"Interpretation prompt: {system_prompt[:200]}...")
         
         messages = [
             {"role": "system", "content": system_prompt},
@@ -229,7 +228,7 @@ class AIProcessor:
                 interpretation_score += 2
             interpretation_score = min(10, interpretation_score)
             
-            logger.info(f"Generated interpretation for {contact_name}, score: {interpretation_score}, response_length: {len(interpretation)}")
+            self.logger.info(f"Generated interpretation for {contact_name}, score: {interpretation_score}, response_length: {len(interpretation)}")
             return {
                 "interpretation": interpretation,
                 "interpretation_score": interpretation_score,
@@ -237,7 +236,7 @@ class AIProcessor:
                 "success": True
             }
         else:
-            logger.error(f"Interpretation failed for {contact_name}: {result['error']}")
+            self.logger.error(f"Interpretation failed for {contact_name}: {result['error']}")
             return result
     
     def calculate_relationship_health_score(self, history: List[Dict]) -> tuple[float, str]:
@@ -250,21 +249,21 @@ class AIProcessor:
         Returns:
             Tuple of (health_score, status_description)
         """
-        logger = logging.getLogger(__name__)
+        self.logger = get_logger("ai_processor")
         if not history:
-            logger.debug("No history provided for health score calculation")
+            self.logger.debug("No history provided for health score calculation")
             return 0.0, "No data yet"
         
         recent_scores = [msg.get('healing_score', 0) for msg in history[-10:] if msg.get('healing_score')]
         
         if not recent_scores:
-            logger.debug("No scored conversations in history")
+            self.logger.debug("No scored conversations in history")
             return 0.0, "No scored conversations yet"
         
         avg_score = sum(recent_scores) / len(recent_scores)
         status = utils.get_relationship_health_status(avg_score)
         
-        logger.debug(f"Calculated health score: {avg_score}, status: {status}")
+        self.logger.debug(f"Calculated health score: {avg_score}, status: {status}")
         return round(avg_score, 1), status
     
     def get_healing_insights(self, history: List[Dict]) -> List[str]:
@@ -277,9 +276,9 @@ class AIProcessor:
         Returns:
             List of insight strings
         """
-        logger = logging.getLogger(__name__)
+        self.logger = get_logger("ai_processor")
         if not history or len(history) < 3:
-            logger.debug("Insufficient history for insights")
+            self.logger.debug("Insufficient history for insights")
             return ["🌱 You're just getting started! Every conversation is a step toward healing."]
         
         insights = []
@@ -306,7 +305,7 @@ class AIProcessor:
         if scores and max(scores[-5:]) < 6:
             insights.append("🤗 Remember: every family faces challenges. You're here working on it - that matters.")
         
-        logger.debug(f"Generated insights: {insights}")
+        self.logger.debug(f"Generated insights: {insights}")
         return insights if insights else ["💙 Keep going - healing happens one conversation at a time."]
 
 # Global AI processor instance
