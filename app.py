@@ -1,242 +1,113 @@
-# auth.py - The Third Voice AI Authentication
-# Supabase authentication management with mobile-friendly error handling and persistent sessions
-
 import streamlit as st
-from supabase import create_client, Client
-from typing import Optional, Dict, Any
-from .state_manager import state_manager
-from .config import ERROR_MESSAGES
+from datetime import datetime
+from typing import Dict, Any, Optional
+from third_voice_ai.config import (
+    APP_NAME, APP_ICON, PAGE_CONFIG, CONTEXTS, UI_MESSAGES,
+    ENABLE_ANALYTICS, ENABLE_FEEDBACK, ENABLE_INTERPRETATION, ERROR_MESSAGES
+)
+from third_voice_ai.auth_manager import auth_manager
+from third_voice_ai.ai_processor import ai_processor
+from third_voice_ai.prompts import prompt_manager
+from third_voice_ai.data_manager import data_manager
+from third_voice_ai.state_manager import state_manager
+from third_voice_ai.ui import AuthUI, MainUI
+from third_voice_ai.ui.components import show_feedback_widget, display_error, display_success
+import validators
+from passlib.hash import bcrypt
+import pandas as pd
+import numpy as np
+from third_voice_ai import get_logger
+from dateutil.parser import parse
+from dotenv import load_dotenv
+import os
 
-class AuthManager:
-    """
-    Authentication manager using Supabase
-    Handles sign up, sign in, sign out with mobile-optimized UX and persistent sessions
-    """
-    
-    def __init__(self):
-        """Initialize Supabase client"""
-        self.supabase = self._init_supabase()
-        # Try to restore session on initialization
-        self._try_restore_session()
-    
-    @st.cache_resource
-    def _init_supabase(_self) -> Client:
-        """Initialize Supabase connection with error handling"""
-        try:
-            url = st.secrets["supabase"]["url"]
-            key = st.secrets["supabase"]["key"]
-            return create_client(url, key)
-        except KeyError as e:
-            st.error(ERROR_MESSAGES["no_supabase_config"])
-            st.stop()
-        except Exception as e:
-            st.error(f"Failed to connect to Supabase: {e}")
-            st.stop()
-    
-    def _try_restore_session(self) -> None:
-        """Try to restore session on app initialization"""
-        try:
-            # Check if we have stored session tokens in browser storage
-            if hasattr(st, 'query_params'):
-                # Get session from URL params if available (for email confirmations)
-                params = st.query_params
-                if 'access_token' in params and 'refresh_token' in params:
-                    try:
-                        self.supabase.auth.set_session(
-                            params['access_token'], 
-                            params['refresh_token']
-                        )
-                        # Clear URL params after setting session
-                        st.query_params.clear()
-                    except Exception as e:
-                        st.warning(f"Could not restore session from URL: {e}")
-            
-            # Try to get existing session
-            session = self.supabase.auth.get_session()
-            if session and session.user:
-                # Session exists, restore authentication state
-                if not state_manager.is_authenticated():
-                    state_manager.set_authenticated(session.user)
-                    
-                    # Import here to avoid circular imports
-                    from .data_manager import data_manager
-                    contacts = data_manager.load_contacts_and_history()
-                    state_manager.set_contacts(contacts)
-                    
-                    if contacts:
-                        state_manager.set_app_mode("contacts_list")
-                    else:
-                        state_manager.set_app_mode("first_time_setup")
-            else:
-                # Try to refresh the session if refresh token exists
-                try:
-                    refreshed_session = self.supabase.auth.refresh_session()
-                    if refreshed_session and refreshed_session.user:
-                        state_manager.set_authenticated(refreshed_session.user)
-                        
-                        from .data_manager import data_manager
-                        contacts = data_manager.load_contacts_and_history()
-                        state_manager.set_contacts(contacts)
-                        
-                        if contacts:
-                            state_manager.set_app_mode("contacts_list")
-                        else:
-                            state_manager.set_app_mode("first_time_setup")
-                except Exception:
-                    # Refresh failed, user needs to log in again
-                    pass
-                    
-        except Exception as e:
-            # Session restoration failed, but don't show error to user
-            # They'll just need to log in again
-            pass
-    
-    def get_current_user_id(self) -> Optional[str]:
-        """Get the current authenticated user's ID"""
-        try:
-            session = self.supabase.auth.get_session()
-            if session and session.user:
-                return session.user.id
-            return None
-        except Exception as e:
-            st.error(f"Error getting user session: {e}")
-            return None
-    
-    def restore_session(self) -> bool:
-        """
-        Restore user session on app reload
-        Returns True if session was restored, False otherwise
-        """
-        try:
-            # First try to refresh the session
-            try:
-                refreshed_session = self.supabase.auth.refresh_session()
-                if refreshed_session and refreshed_session.user:
-                    if not state_manager.is_authenticated():
-                        state_manager.set_authenticated(refreshed_session.user)
-                        
-                        # Import here to avoid circular imports
-                        from .data_manager import data_manager
-                        contacts = data_manager.load_contacts_and_history()
-                        state_manager.set_contacts(contacts)
-                        
-                        if contacts:
-                            state_manager.set_app_mode("contacts_list")
-                        else:
-                            state_manager.set_app_mode("first_time_setup")
-                        
-                        return True
-            except Exception:
-                pass
-            
-            # If refresh failed, try to get existing session
-            session = self.supabase.auth.get_session()
-            if session and session.user:
-                if not state_manager.is_authenticated():
-                    state_manager.set_authenticated(session.user)
-                    
-                    # Import here to avoid circular imports
-                    from .data_manager import data_manager
-                    contacts = data_manager.load_contacts_and_history()
-                    state_manager.set_contacts(contacts)
-                    
-                    if contacts:
-                        state_manager.set_app_mode("contacts_list")
-                    else:
-                        state_manager.set_app_mode("first_time_setup")
-                    
-                    return True
-            return False
-        except Exception as e:
-            # Don't show error to user, just return False
-            return False
-    
-    def sign_up(self, email: str, password: str) -> bool:
-        """
-        Sign up new user
-        Returns True if successful, False otherwise
-        """
-        try:
-            response = self.supabase.auth.sign_up({"email": email, "password": password})
-            if response.user:
-                state_manager.set_verification_notice(email)
-                return True
-            elif response.error:
-                state_manager.set_error(f"Sign-up failed: {response.error.message}")
-                return False
-        except Exception as e:
-            state_manager.set_error(f"An unexpected error occurred during sign-up: {e}")
-            return False
-        
-        return False
-    
-    def sign_in(self, email: str, password: str) -> bool:
-        """
-        Sign in existing user
-        Returns True if successful, False otherwise
-        """
-        try:
-            response = self.supabase.auth.sign_in_with_password({"email": email, "password": password})
-            if response.user:
-                state_manager.set_authenticated(response.user)
-                
-                # Load user data
-                from .data_manager import data_manager
-                contacts = data_manager.load_contacts_and_history()
-                state_manager.set_contacts(contacts)
-                
-                if not contacts:
-                    state_manager.set_app_mode("first_time_setup")
-                else:
-                    state_manager.set_app_mode("contacts_list")
-                
-                st.success(f"Welcome back, {response.user.email}!")
-                return True
-            elif response.error:
-                state_manager.set_error(f"Login failed: {response.error.message}")
-                return False
-        except Exception as e:
-            state_manager.set_error(f"An unexpected error occurred during login: {e}")
-            return False
-        
-        return False
-    
-    def sign_out(self) -> bool:
-        """
-        Sign out current user
-        Returns True if successful, False otherwise
-        """
-        try:
-            response = self.supabase.auth.sign_out()
-            if not response.error:
-                # Clear session state
-                state_manager.clear_authentication()
-                
-                # Clear any cached data
-                from .data_manager import data_manager
-                data_manager.clear_cache()
-                
-                st.info("You have been logged out.")
-                return True
-            else:
-                state_manager.set_error(f"Logout failed: {response.error.message}")
-                return False
-        except Exception as e:
-            state_manager.set_error(f"An unexpected error occurred during logout: {e}")
-            return False
-    
-    def resend_verification(self, email: str) -> bool:
-        """
-        Resend verification email
-        Returns True if successful, False otherwise
-        """
-        try:
-            self.supabase.auth.resend({"type": "signup", "email": email})
-            st.success("Verification email resent!")
-            return True
-        except Exception as e:
-            st.warning("Could not resend email. Please try signing up again if needed.")
-            return False
+# Load environment variables
+load_dotenv()
 
-# Global auth manager instance
-auth_manager = AuthManager()
+# Configure logging
+logger = get_logger("app")
+
+# Set Streamlit page configuration
+st.set_page_config(
+    page_title="The Third Voice AI",
+    page_icon="🎙️",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
+
+def main():
+    """Main application logic"""
+    logger.info("Starting The Third Voice AI application")
+    
+    # Initialize session state
+    state_manager.init_session_state()
+    
+    # Try to restore authentication session on every app load
+    if not state_manager.is_authenticated():
+        session_restored = auth_manager.restore_session()
+        if session_restored:
+            logger.info("Session successfully restored from Supabase")
+            # Force a rerun to update the UI with the restored session
+            st.rerun()
+    
+    # Handle authentication state
+    if not state_manager.is_authenticated():
+        handle_authentication()
+    else:
+        show_main_app()
+
+def handle_authentication():
+    """Handle authentication flow"""
+    app_mode = state_manager.get_app_mode()
+    
+    if app_mode == "verification_notice":
+        AuthUI.show_verification_notice(auth_manager, state_manager)
+    elif app_mode == "signup":
+        AuthUI.show_signup_page(auth_manager, state_manager)
+    else:
+        AuthUI.show_login_page(auth_manager, state_manager)
+
+def show_main_app():
+    """Display main application interface with sidebar and proper navigation"""
+    # Show sidebar
+    MainUI.show_sidebar(state_manager, auth_manager)
+    
+    # Main content area
+    app_mode = state_manager.get_app_mode()
+    
+    # Route to appropriate page based on app mode
+    if app_mode == "first_time_setup":
+        MainUI.show_first_time_setup(state_manager, data_manager)
+    elif app_mode == "add_contact":
+        MainUI.show_add_contact_page(state_manager, data_manager)
+    elif app_mode == "conversation":
+        MainUI.show_conversation_interface(state_manager, data_manager, ai_processor)
+    elif app_mode == "contacts_list":
+        MainUI.show_contacts_list(state_manager, data_manager)
+    elif app_mode == "edit_contact":
+        MainUI.show_edit_contact_page(state_manager, data_manager)
+    else:
+        # Default to contacts list
+        state_manager.navigate_to("contacts_list")
+        st.rerun()
+    
+    # Display error if present
+    if state_manager.get_error():
+        display_error(state_manager.get_error())
+        state_manager.clear_error()
+    
+    # Single feedback widget for main app - only show if enabled
+    if ENABLE_FEEDBACK:
+        show_feedback_widget(context="main_app")
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        logger.error(f"Application error: {str(e)}")
+        st.error("An unexpected error occurred. Please refresh the page.")
+        if st.button("🔄 Refresh Page"):
+            st.rerun()
+    
+    # Single feedback widget at app level - removed from individual functions
+    # This ensures only one feedback widget appears per page load
