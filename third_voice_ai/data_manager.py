@@ -61,4 +61,3 @@ class DataManager:
             return False
     
     # [Rest of the class unchanged]
-```
