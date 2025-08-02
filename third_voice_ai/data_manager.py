@@ -1,4 +1,3 @@
-```python
 # data_manager.py - The Third Voice AI Data Management
 # Supabase database operations with mobile-friendly caching
 
