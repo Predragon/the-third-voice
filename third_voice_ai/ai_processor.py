@@ -1,4 +1,3 @@
-```python
 # ai_processor.py - The Third Voice AI Processing Engine
 # OpenRouter integration with mobile-optimized error handling
 
