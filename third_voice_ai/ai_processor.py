@@ -155,6 +155,3 @@ class AIProcessor:
             is_incoming=True,
             instruction="Analyze the emotional subtext of this incoming message from {contact_name}. Identify underlying emotions, unmet needs, and suggest actionable ways to respond that foster healing in the {context} context."
         )
-    
-    # [Rest of the class unchanged]
-```
