@@ -5,7 +5,7 @@ from third_voice_ai.config import Config
 from third_voice_ai.auth_manager import auth_manager
 from third_voice_ai.ai_processor import ai_processor
 from third_voice_ai.prompts import prompt_manager
-from third_voice_ai.data_manager import data_manager
+from third_voice_ai.data_manager import DataManager
 from third_voice_ai.state_manager import state_manager
 from third_voice_ai.ui import AuthUI, MainUI
 from third_voice_ai.ui.components import show_feedback_widget, display_error, display_success
@@ -39,6 +39,9 @@ def main():
     # Initialize session state
     state_manager.init_session_state()
     
+    # Initialize data_manager after auth_manager
+    data_manager = DataManager(Config, auth_manager)
+    
     # Try to restore authentication session on every app load
     if not state_manager.is_authenticated():
         session_restored = auth_manager.restore_session()
@@ -51,7 +54,7 @@ def main():
     if not state_manager.is_authenticated():
         handle_authentication()
     else:
-        show_main_app()
+        show_main_app(data_manager)
 
 def handle_authentication():
     """Handle authentication flow"""
@@ -64,7 +67,7 @@ def handle_authentication():
     else:
         AuthUI.show_login_page(auth_manager, state_manager)
 
-def show_main_app():
+def show_main_app(data_manager):
     """Display main application interface with sidebar and proper navigation"""
     # Show sidebar
     MainUI.show_sidebar(state_manager, auth_manager)
@@ -105,6 +108,3 @@ if __name__ == "__main__":
         st.error("An unexpected error occurred. Please refresh the page.")
         if st.button("🔄 Refresh Page"):
             st.rerun()
-    
-    # Single feedback widget at app level - removed from individual functions
-    # This ensures only one feedback widget appears per page load
