@@ -1,5 +1,5 @@
 # config.py - The Third Voice AI Configuration
-# Configuration constants and settings for the application
+# Central configuration for application settings and constants
 
 # Module-level constants for direct import
 APP_NAME = "The Third Voice AI"
@@ -7,6 +7,11 @@ APP_ICON = "🎙️"
 VERSION = "2.0.0"
 MISSION_STATEMENT = "When both people are speaking from pain, someone must be the third voice."
 
+# Supabase Configuration (placeholders, override in Streamlit secrets)
+SUPABASE_URL = "your_supabase_url"
+SUPABASE_KEY = "your_supabase_key"
+
+# Relationship Contexts
 CONTEXTS = {
     "romantic": {"icon": "💕", "description": "Partner & intimate relationships", "default_name": "Partner"},
     "coparenting": {"icon": "👨‍👩‍👧‍👦", "description": "Raising children together", "default_name": "Co-parent"},
@@ -15,6 +20,7 @@ CONTEXTS = {
     "friend": {"icon": "🤝", "description": "Friendships & social bonds", "default_name": "Friend"}
 }
 
+# Default Session State
 DEFAULT_SESSION_STATE = {
     'authenticated': False,
     'user': None,
@@ -33,6 +39,7 @@ DEFAULT_SESSION_STATE = {
     'logged_out_intentionally': False
 }
 
+# Error Messages
 ERROR_MESSAGES = {
     "no_api_key": "OpenRouter API Key not found in Streamlit secrets under [openrouter]. Please add it.",
     "no_supabase_config": "Missing Streamlit secret. Please ensure [supabase] url and key are set in your secrets.",
@@ -44,6 +51,7 @@ ERROR_MESSAGES = {
     "database_error": "Database error occurred. Please try again."
 }
 
+# UI Messages
 UI_MESSAGES = {
     "welcome_first_time": "Choose a relationship type to get started, or add a custom contact:",
     "no_contacts": "No contacts yet. Add your first contact to get started!",
@@ -52,6 +60,7 @@ UI_MESSAGES = {
     "verification_sent": "Verification email sent. Please check your inbox and spam folder."
 }
 
+# Feature Flags
 ENABLE_ANALYTICS = True
 ENABLE_FEEDBACK = True
 ENABLE_INTERPRETATION = True
@@ -96,54 +105,33 @@ CACHE_EXPIRY_HOURS = 24
 class Config:
     """Configuration class for The Third Voice AI"""
     
-    # Application Metadata
     APP_NAME = APP_NAME
     APP_ICON = APP_ICON
     VERSION = VERSION
     MISSION_STATEMENT = MISSION_STATEMENT
-
-    # Relationship Contexts
+    SUPABASE_URL = SUPABASE_URL
+    SUPABASE_KEY = SUPABASE_KEY
     CONTEXTS = CONTEXTS
-
-    # AI Model Configuration
-    API_URL = API_URL
-    MODEL = MODEL
-    DEFAULT_TEMPERATURE = DEFAULT_TEMPERATURE
-    DEFAULT_MAX_TOKENS = DEFAULT_MAX_TOKENS
-    API_TIMEOUT = API_TIMEOUT
-
-    # Streamlit Configuration
-    PAGE_CONFIG = PAGE_CONFIG
-
-    # Session State Defaults
     DEFAULT_SESSION_STATE = DEFAULT_SESSION_STATE
-
-    # Database Configuration
-    CACHE_TTL = CACHE_TTL
-    MESSAGE_HISTORY_LIMIT = MESSAGE_HISTORY_LIMIT
-    RECENT_MESSAGES_DISPLAY = RECENT_MESSAGES_DISPLAY
-
-    # Feature Flags
+    ERROR_MESSAGES = ERROR_MESSAGES
+    UI_MESSAGES = UI_MESSAGES
     ENABLE_ANALYTICS = ENABLE_ANALYTICS
     ENABLE_FEEDBACK = ENABLE_FEEDBACK
     ENABLE_INTERPRETATION = ENABLE_INTERPRETATION
     ENABLE_RELATIONSHIP_PROGRESS = ENABLE_RELATIONSHIP_PROGRESS
     ENABLE_OFFLINE_MODE = ENABLE_OFFLINE_MODE
-
-    # Mobile Optimization
+    API_URL = API_URL
+    MODEL = MODEL
+    DEFAULT_TEMPERATURE = DEFAULT_TEMPERATURE
+    DEFAULT_MAX_TOKENS = DEFAULT_MAX_TOKENS
+    API_TIMEOUT = API_TIMEOUT
+    PAGE_CONFIG = PAGE_CONFIG
+    CACHE_TTL = CACHE_TTL
+    MESSAGE_HISTORY_LIMIT = MESSAGE_HISTORY_LIMIT
+    RECENT_MESSAGES_DISPLAY = RECENT_MESSAGES_DISPLAY
     MOBILE_BREAKPOINT = MOBILE_BREAKPOINT
     COMPACT_MODE_THRESHOLD = COMPACT_MODE_THRESHOLD
-
-    # Error Messages
-    ERROR_MESSAGES = ERROR_MESSAGES
-
-    # UI Messages
-    UI_MESSAGES = UI_MESSAGES
-
-    # Scoring System
     HEALING_SCORE_THRESHOLDS = HEALING_SCORE_THRESHOLDS
-
-    # Rate Limiting
     MAX_REQUESTS_PER_HOUR = MAX_REQUESTS_PER_HOUR
     CACHE_EXPIRY_HOURS = CACHE_EXPIRY_HOURS
 
@@ -152,11 +140,11 @@ config = Config()
 
 __all__ = [
     'APP_NAME', 'APP_ICON', 'VERSION', 'MISSION_STATEMENT',
-    'CONTEXTS', 'DEFAULT_SESSION_STATE', 'ERROR_MESSAGES', 'UI_MESSAGES',
-    'ENABLE_ANALYTICS', 'ENABLE_FEEDBACK', 'ENABLE_INTERPRETATION',
-    'ENABLE_RELATIONSHIP_PROGRESS', 'ENABLE_OFFLINE_MODE',
+    'SUPABASE_URL', 'SUPABASE_KEY', 'CONTEXTS', 'DEFAULT_SESSION_STATE',
+    'ERROR_MESSAGES', 'UI_MESSAGES', 'ENABLE_ANALYTICS', 'ENABLE_FEEDBACK',
+    'ENABLE_INTERPRETATION', 'ENABLE_RELATIONSHIP_PROGRESS', 'ENABLE_OFFLINE_MODE',
     'API_URL', 'MODEL', 'DEFAULT_TEMPERATURE', 'DEFAULT_MAX_TOKENS', 'API_TIMEOUT',
     'PAGE_CONFIG', 'CACHE_TTL', 'MESSAGE_HISTORY_LIMIT', 'RECENT_MESSAGES_DISPLAY',
     'MOBILE_BREAKPOINT', 'COMPACT_MODE_THRESHOLD', 'HEALING_SCORE_THRESHOLDS',
-    'MAX_REQUESTS_PER_HOUR', 'CACHE_EXPIRY_HOURS', 'Config'
+    'MAX_REQUESTS_PER_HOUR', 'CACHE_EXPIRY_HOURS', 'Config', 'config'
 ]
