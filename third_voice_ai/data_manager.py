@@ -20,7 +20,7 @@ class DataManager:
         self.supabase = auth_manager.supabase
     
     @st.cache_data(ttl=CACHE_TTL)
-    def load_contacts_and_history(self) -> Dict[str, Any]:
+    def load_contacts_and_history(_self) -> Dict[str, Any]:
         """
         Load user contacts and conversation history
         
