@@ -177,4 +177,3 @@ class MainUI:
             display_error("Failed to interpret message. Please try again.")
     
     # [Rest of the class unchanged]
-```
