@@ -1,4 +1,3 @@
-```python
 # third_voice_ai/ui/main_ui.py
 # Main application UI components for The Third Voice AI
 
