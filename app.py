@@ -10,7 +10,6 @@ import requests
 import time
 import uuid
 from supabase import create_client, Client
-import openai
 
 # ==========================================
 # CONFIGURATION & CONSTANTS SECTION
