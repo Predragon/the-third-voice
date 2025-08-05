@@ -1,0 +1,30 @@
+"""
+App Controller Module for The Third Voice AI
+Main application controller that orchestrates all components
+"""
+
+import streamlit as st
+import traceback
+from .components import UIComponents
+from .pages import AuthenticationUI, OnboardingFlow, Dashboard
+
+
+class ThirdVoiceApp:
+    """Main application controller"""
+    
+    def __init__(self, db_manager, ai_engine, auth_manager):
+        self.db = db_manager
+        self.ai_engine = ai_engine
+        self.auth_manager = auth_manager
+        self.auth_ui = AuthenticationUI(self.auth_manager)
+        self.onboarding = OnboardingFlow(self.db, self.ai_engine)
+        self.dashboard = Dashboard(self.db, self.ai_engine)
+    
+    def run(self):
+        """Main application entry point"""
+        
+        # Load custom CSS for mobile optimization
+        UIComponents.load_custom_css()
+        
+        # Authentication check
+        
