@@ -517,7 +517,7 @@ class AdminDashboard:
         
         # Check if user is admin (you can hardcode your email for now)
         user_email = auth_manager.get_current_user_email()
-        ADMIN_EMAILS = ["thethirdvoice.ai@gmail.com", "hello@thethirdvoice.ai"]  # Add your email
+        ADMIN_EMAILS = ["thethirdvoice.ai@gmail.com", "hello@thethirdvoice.ai, pmirkovic@yahoo.com"]  # Add your email
         
         if user_email not in ADMIN_EMAILS:
             st.error("🔒 Access Denied - Admin Only")
