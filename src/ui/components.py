@@ -468,3 +468,7 @@ class UIComponents:
                 with st.expander("⚠️ Things to be aware of"):
                     for warning in ai_response.warnings:
                         st.warning(warning)
+            
+
+# Add model info right after warnings
+st.caption(f"🤖 {ai_response.model_display}")
