@@ -1,335 +1,379 @@
+"""
+AI Engine Module - Production Version
+Handles AI processing for relationship communication healing
+With improved cache management and validation
+"""
+
 import hashlib
 import json
-import logging
-import re
-from datetime import datetime
-from enum import Enum
-from typing import Optional
-
 import requests
+import streamlit as st
+from datetime import datetime, timedelta
+from typing import Optional
+from enum import Enum
 
-from ..config.settings import AppConfig
 from ..data.models import AIResponse
+from ..config.settings import AppConfig
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 class MessageType(Enum):
+    """Message types for AI processing"""
     TRANSFORM = "transform"
     INTERPRET = "interpret"
 
-class RelationshipContext(Enum):
-    ROMANTIC = ("romantic", "romantic partner", "💕")
-    COPARENTING = ("coparenting", "raising children together", "👨‍👩‍👧")
-    WORKPLACE = ("workplace", "professional relationship", "💼")
-    FAMILY = ("family", "family member", "👪")
-    FRIEND = ("friend", "friendship", "🤝")
 
-    def __init__(self, value, description, emoji):
-        self._value_ = value
-        self.description = description
-        self.emoji = emoji
+class RelationshipContext(Enum):
+    """Relationship context types"""
+    ROMANTIC = "romantic"
+    COPARENTING = "coparenting"
+    WORKPLACE = "workplace"
+    FAMILY = "family"
+    FRIEND = "friend"
+    
+    @property
+    def emoji(self):
+        emoji_map = {
+            "romantic": "💕",
+            "coparenting": "👨‍👩‍👧‍👦", 
+            "workplace": "🏢",
+            "family": "🏠",
+            "friend": "🤝"
+        }
+        return emoji_map[self.value]
+    
+    @property
+    def description(self):
+        desc_map = {
+            "romantic": "Partner & intimate relationships",
+            "coparenting": "Raising children together",
+            "workplace": "Professional relationships", 
+            "family": "Extended family connections",
+            "friend": "Friendships & social bonds"
+        }
+        return desc_map[self.value]
+
 
 class AIEngine:
-    """AI Engine for processing messages with emotional intelligence"""
-    CACHE_VERSION = "v1.0"
-
+    """AI processing engine using OpenRouter"""
+    
     def __init__(self):
-        self.base_url = AppConfig.OPENROUTER_BASE_URL
-        self.api_key = AppConfig.get_openrouter_api_key()
-        self.available_models = self._get_available_models()
-        self.current_model_index = 0
-
-    def _get_available_models(self):
-        """Retrieve available models from secrets or fallback to default"""
-        models = [AppConfig.AI_MODEL]
-        try:
-            # Load additional models from secrets.toml
-            import toml
-            secrets_path = ".streamlit/secrets.toml"
-            secrets = toml.load(secrets_path) if hasattr(toml, 'load') else {}
-            models.extend([secrets.get("MODELS", {}).get(f"model{i}", "") for i in range(2, 7)])
-            models = [m for m in models if m]  # Remove empty strings
-        except Exception as e:
-            logger.warning(f"Failed to load models from secrets: {str(e)}")
-        return models or [AppConfig.AI_MODEL]
-
+        pass
+    
     def _create_message_hash(self, message: str, contact_context: str, message_type: str) -> str:
-        """Create a unique hash for the message, context, and type"""
-        message = re.sub(r'[^\w\s.,!?]', '', message.strip())  # Sanitize input
-        combined = f"{message}_{contact_context}_{message_type}_{self.CACHE_VERSION}"
+        """Create a hash for caching purposes with version for cache invalidation"""
+        # Add version to hash to invalidate old cache when needed
+        CACHE_VERSION = "v1.0"  # Increment this if you need to invalidate all cache
+        
+        # Clean message to avoid whitespace issues
+        clean_message = message.strip()
+        combined = f"{clean_message}_{contact_context}_{message_type}_{CACHE_VERSION}"
         return hashlib.md5(combined.encode()).hexdigest()
-
-    def _get_system_prompt(self, message_type: str, context_desc: str) -> str:
-        """Generate system prompt based on message type and context"""
-        base_prompt = (
-            "You are a relationship communication expert helping someone communicate with "
-            f"their {context_desc}. "
-        )
-        if message_type == MessageType.TRANSFORM.value:
-            return (
-                base_prompt +
-                "TASK: Rewrite the user's message to be more loving, compassionate, and likely to be well-received, "
-                "while preserving the original intent. "
-                "CRITICAL INSTRUCTIONS:\n"
-                "- You are in TRANSFORM mode - rewrite the user's message\n"
-                "- Use 'I' statements to express feelings\n"
-                "- Avoid blame or accusations\n"
-                "- Suggest collaboration or vulnerability\n"
-                "RESPOND ONLY WITH JSON:\n"
-                "{\n"
-                '  "transformed_message": "The rewritten message",\n'
-                '  "healing_score": 7,\n'
-                '  "sentiment": "neutral",\n'
-                '  "emotional_state": "calm",\n'
-                '  "explanation": "Why this message is more likely to be well-received"\n'
-                "}"
-            )
-        else:  # INTERPRET
-            return (
-                base_prompt +
-                "TASK: The user received a challenging message in their "
-                f"{context_desc} relationship. Help them understand what the sender really means "
-                "and suggest a loving response.\n"
-                "CRITICAL INSTRUCTIONS:\n"
-                "- You are in INTERPRET mode - help them respond to what they received\n"
-                "- DO NOT rewrite their message - suggest how to RESPOND\n"
-                "- Help decode the underlying emotions and needs\n"
-                "- Suggest a compassionate response back\n"
-                "RESPOND ONLY WITH JSON:\n"
-                "{\n"
-                '  "transformed_message": "A suggested loving and understanding response",\n'
-                '  "healing_score": 7,\n'
-                '  "sentiment": "neutral",\n'
-                '  "emotional_state": "hurt",\n'
-                '  "explanation": "What the sender likely really means beneath their words",\n'
-                '  "subtext": "The underlying emotions or needs they\'re expressing",\n'
-                '  "needs": ["emotional need 1", "emotional need 2"],\n'
-                '  "warnings": ["any red flags to be aware of"]\n'
-                "}"
-            )
-
-    def _normalize_sentiment(self, sentiment: str) -> str:
-        """Normalize sentiment to allowed values"""
-        sentiment = sentiment.lower() if sentiment else "unknown"
-        allowed = ["positive", "negative", "neutral", "unknown"]
-        return sentiment if sentiment in allowed else "unknown"
-
-    def _normalize_emotional_state(self, emotional_state: str) -> str:
-        """Normalize emotional state"""
-        emotional_state = emotional_state.lower() if emotional_state else "unclear"
-        allowed = ["happy", "sad", "angry", "frustrated", "empathetic", "calm", "hurt", "unclear"]
-        return emotional_state if emotional_state in allowed else "unclear"
-
-    def _validate_cached_response(self, cached_response: AIResponse, message: str,
+    
+    def _validate_cached_response(self, cached_response: AIResponse, message: str, 
                                  contact_context: str, message_type: str) -> bool:
-        """Validate if cached response is still relevant"""
+        """Validate that cached response makes sense for the input"""
+        
+        # Basic validation checks
         if not cached_response or not cached_response.transformed_message:
             return False
+        
+        # Check for obvious mismatches (like meetings vs phone calls)
         message_lower = message.lower()
         response_lower = cached_response.transformed_message.lower()
-        if message_type == MessageType.TRANSFORM.value:
-            # Ensure key words from original message are reflected
-            key_words = message_lower.split()
-            return any(word in response_lower for word in key_words if len(word) > 3)
-        else:  # INTERPRET
-            # Check if response addresses key emotional triggers
-            emotional_triggers = ["never", "always", "late", "sorry", "time", "father", "mother"]
-            if any(trigger in message_lower for trigger in emotional_triggers):
-                return any(trigger in response_lower for trigger in ["sorry", "understand", "discuss"])
-            # Validate sentiment alignment
-            if cached_response.sentiment == "negative" and "sorry" not in response_lower:
-                logger.warning("Cache validation failed: Negative sentiment lacks apology")
-                return False
-        return True
-
-    def _make_robust_ai_request(self, payload: dict, retries: int = 3) -> Optional[dict]:
-        """Make API request with model fallback and retry logic"""
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
+        
+        # Keywords that should match between input and output
+        key_topics = {
+            'phone': ['phone', 'call', 'calling', 'reach'],
+            'late': ['late', 'time', 'punctual', 'schedule'],
+            'meeting': ['meeting', 'work', 'professional'],
+            'money': ['money', 'financial', 'cost', 'expensive'],
+            'help': ['help', 'support', 'assist']
         }
-        for attempt in range(retries):
-            model = self.available_models[self.current_model_index % len(self.available_models)]
-            payload["model"] = model
-            logger.info(f"Attempting API request with model: {model}, attempt {attempt + 1}")
-            try:
-                response = requests.post(
-                    f"{self.base_url}/chat/completions",
-                    headers=headers,
-                    json=payload,
-                    timeout=10
-                )
-                response.raise_for_status()
-                logger.info(f"API response: {response.text[:200]}...")  # Truncate for brevity
-                self.current_model_index = 0  # Reset to primary model on success
-                return response.json()
-            except requests.RequestException as e:
-                logger.error(f"API error with {model}: {str(e)}")
-                if isinstance(e, requests.HTTPError) and e.response.status_code == 429:
-                    logger.warning("Rate limit hit, switching model")
-                self.current_model_index += 1  # Try next model
-                if self.current_model_index >= len(self.available_models):
-                    self.current_model_index = 0  # Loop back
-        logger.error("All API attempts failed")
-        return None
+        
+        # Find what topic the input is about
+        input_topic = None
+        for topic, keywords in key_topics.items():
+            if any(keyword in message_lower for keyword in keywords):
+                input_topic = topic
+                break
+        
+        # If we identified a topic, make sure response is related
+        if input_topic:
+            topic_keywords = key_topics[input_topic]
+            if not any(keyword in response_lower for keyword in topic_keywords):
+                print(f"⚠️ Cache validation failed: Input about '{input_topic}' but response seems unrelated")
+                return False
+        
+        return True
+    
+    def _normalize_sentiment(self, sentiment: str) -> str:
+        """Normalize sentiment to match database constraints"""
+        sentiment = sentiment.lower().strip()
+        
+        sentiment_map = {
+            'positive': 'positive',
+            'negative': 'negative', 
+            'neutral': 'neutral',
+            'caring': 'positive',
+            'loving': 'positive',
+            'supportive': 'positive',
+            'kind': 'positive',
+            'empathetic': 'positive',
+            'concerned': 'neutral',
+            'worried': 'neutral',
+            'anxious': 'negative',
+            'angry': 'negative',
+            'hurt': 'negative',
+            'frustrated': 'negative',
+            'sad': 'negative',
+            'defensive': 'negative',
+            'confused': 'neutral'
+        }
+        
+        return sentiment_map.get(sentiment, 'neutral')
+    
+    def _normalize_emotional_state(self, emotional_state: str) -> str:
+        """Normalize emotional state to common values"""
+        emotional_state = emotional_state.lower().strip()
+        
+        state_map = {
+            'caring': 'caring',
+            'loving': 'loving',
+            'concerned': 'concerned',
+            'worried': 'worried',
+            'hurt': 'hurt',
+            'angry': 'angry',
+            'frustrated': 'frustrated',
+            'sad': 'sad',
+            'happy': 'happy',
+            'neutral': 'neutral',
+            'confused': 'confused',
+            'defensive': 'defensive',
+            'anxious': 'anxious',
+            'supportive': 'supportive',
+            'empathetic': 'empathetic',
+            'understanding': 'understanding',
+            'unclear': 'unclear',
+            'error': 'error'
+        }
+        
+        return state_map.get(emotional_state, 'neutral')
+    
+    def _get_system_prompt(self, message_type: str, relationship_context: str) -> str:
+        """Get system prompt based on message type and context"""
+        
+        if message_type == "transform":
+            return f"""You are a relationship communication expert helping someone rewrite their message to be kinder.
+
+TASK: The user wants to send a message but knows it could be said more lovingly. Your job is to REWRITE their exact message to be more compassionate while keeping the same core meaning and intent.
+
+CONTEXT: This is for a {relationship_context} relationship.
+
+CRITICAL INSTRUCTIONS:
+- You are in TRANSFORM mode - REWRITE their message to be better
+- DO NOT respond to their message - TRANSFORM it
+- Keep their core intent but make it more loving
+- Turn accusations into "I" statements
+- Show vulnerability instead of blame
+- Keep the same topic and context as their original message
+
+EXAMPLE:
+Input: "You never pickup the phone when I call"
+Output: {{"transformed_message": "I feel disconnected when I can't reach you. Could we find a good time to talk?", "healing_score": 8, "sentiment": "positive", "emotional_state": "caring", "explanation": "Changed accusation to vulnerable feeling, offered collaborative solution"}}
+
+RESPOND ONLY WITH JSON:
+{{
+  "transformed_message": "The rewritten, kinder version of their exact message",
+  "healing_score": 8,
+  "sentiment": "positive",
+  "emotional_state": "caring", 
+  "explanation": "What was changed and why it's more healing"
+}}"""
+
+        else:  # INTERPRET mode
+            return f"""You are a relationship communication expert helping someone understand a difficult message they received.
+
+TASK: The user received a challenging message in their {relationship_context} relationship. Help them understand what the sender really means and suggest a loving response.
+
+CRITICAL INSTRUCTIONS:
+- You are in INTERPRET mode - help them respond to what they received
+- DO NOT rewrite their message - suggest how to RESPOND
+- Help decode the underlying emotions and needs
+- Suggest a compassionate response back
+
+RESPOND ONLY WITH JSON:
+{{
+  "transformed_message": "A suggested loving and understanding response",
+  "healing_score": 7,
+  "sentiment": "neutral",
+  "emotional_state": "hurt",
+  "explanation": "What the sender likely really means beneath their words",
+  "subtext": "The underlying emotions or needs they're expressing",
+  "needs": ["emotional need 1", "emotional need 2"],
+  "warnings": ["any red flags to be aware of"]
+}}"""
 
     def process_message(self, message: str, contact_context: str, message_type: str,
                        contact_id: str, user_id: str, db) -> AIResponse:
-        """Process a message through AI or cache"""
-        # Sanitize input
-        message = re.sub(r'[^\w\s.,!?]', '', message.strip())
-        if not message:
-            logger.error("Empty message after sanitization")
-            return AIResponse(
-                transformed_message="I'm sorry, I couldn't process an empty message. Please share your thoughts.",
-                healing_score=0,
-                sentiment="neutral",
-                emotional_state="unclear",
-                explanation="No valid input provided."
-            )
-
-        # Validate inputs
-        try:
-            message_type = MessageType(message_type.lower()).value
-            context_enum = RelationshipContext(contact_context.lower())
-            context_desc = context_enum.description
-        except ValueError:
-            logger.error(f"Invalid message_type: {message_type} or contact_context: {contact_context}")
-            return AIResponse(
-                transformed_message="I'm sorry, I couldn't process this request. Please try again.",
-                healing_score=0,
-                sentiment="neutral",
-                emotional_state="unclear",
-                explanation="Invalid message type or context provided."
-            )
-
-        # Check cache
+        """Process a message with AI and return structured response"""
+        
+        # Check cache first with validation
         message_hash = self._create_message_hash(message, contact_context, message_type)
         cached_response = db.check_cache(contact_id, message_hash, user_id)
-        if cached_response and self._validate_cached_response(cached_response, message, contact_context, message_type):
-            logger.info(f"Cache hit for message_hash: {message_hash}")
-            return cached_response
+        
+        if cached_response:
+            # Validate cached response makes sense
+            if self._validate_cached_response(cached_response, message, contact_context, message_type):
+                return cached_response
+            else:
+                # Invalid cache - clear it and continue with fresh API call
+                print(f"🗑️ Clearing invalid cache entry for hash: {message_hash}")
+                db.clear_cache_entry(contact_id, message_hash, user_id)
+        
+        try:
+            # Get relationship context description
+            context_desc = "general relationship"
+            for rel_context in RelationshipContext:
+                if rel_context.value == contact_context:
+                    context_desc = rel_context.description.lower()
+                    break
+            
+            system_prompt = self._get_system_prompt(message_type, context_desc)
+            
+            # Prepare the request
+            headers = {
+                "Authorization": f"Bearer {AppConfig.get_openrouter_api_key()}",
+                "Content-Type": "application/json"
+            }
+            
+            # Make the task explicit in the user message
+            if message_type == "transform":
+                user_message = f"""TRANSFORM MODE: I want to send this message but need to say it more lovingly. Please REWRITE it to be kinder while keeping the same meaning:
 
-        # Prepare API call
-        system_prompt = self._get_system_prompt(message_type, context_desc)
-        user_message = (
-            f"{message_type.upper()} MODE: "
-            f"I {'want to say something to my' if message_type == MessageType.TRANSFORM.value else 'received this message from my'} "
-            f"{context_desc}: \n\n"
-            f"Message: \"{message}\"\n\n"
-            f"Please {'rewrite my message to be more loving and likely to be well-received' if message_type == MessageType.TRANSFORM.value else 'analyze the emotions and needs behind the message and suggest a loving, empathetic response. Provide a detailed explanation of the sender\\'s subtext and needs.'}."
-        )
+Original message: "{message}"
 
-        payload = {
-            "model": self.available_models[0],  # Start with primary model
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
-            ],
-            "max_tokens": AppConfig.MAX_TOKENS,
-            "temperature": AppConfig.TEMPERATURE,  # Use config value
-            "response_format": {"type": "json_object"} if "gpt" in self.available_models[0].lower() else None
-        }
+Please rewrite this to be more compassionate."""
+            else:
+                user_message = f"""INTERPRET MODE: I received this difficult message and need help understanding it and responding:
 
-        # Make API call with fallback
-        response_data = self._make_robust_ai_request(payload)
-        if response_data and "choices" in response_data and response_data["choices"]:
+Message I received: "{message}"
+
+Please help me understand what they really mean and suggest a loving response."""
+            
+            payload = {
+                "model": AppConfig.AI_MODEL,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message}
+                ],
+                "max_tokens": AppConfig.MAX_TOKENS,
+                "temperature": 0.3,
+                "response_format": {"type": "json_object"} if "gpt" in AppConfig.AI_MODEL.lower() else None
+            }
+            
+            # Remove None values from payload
+            payload = {k: v for k, v in payload.items() if v is not None}
+            
+            # Make API call
+            response = requests.post(
+                f"{AppConfig.OPENROUTER_BASE_URL}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=30
+            )
+            
+            response.raise_for_status()
+            
+            # Parse response
+            response_data = response.json()
+            
+            if "choices" not in response_data or not response_data["choices"]:
+                raise ValueError("No choices in API response")
+            
+            ai_text = response_data["choices"][0]["message"]["content"]
+            
+            if not ai_text or ai_text.strip() == "":
+                raise ValueError("Empty AI response")
+            
+            # Parse JSON
             try:
-                content = response_data["choices"][0]["message"]["content"]
-                # Strip markdown code blocks if present
-                content = content.strip().strip("```json").strip("```").strip()
-                ai_data = json.loads(content)
-                ai_response = AIResponse(
-                    transformed_message=ai_data.get("transformed_message", ""),
-                    healing_score=min(ai_data.get("healing_score", 0), 10),
-                    sentiment=self._normalize_sentiment(ai_data.get("sentiment", "unknown")),
-                    emotional_state=self._normalize_emotional_state(ai_data.get("emotional_state", "unclear")),
-                    explanation=ai_data.get("explanation", ""),
-                    subtext=ai_data.get("subtext", ""),
-                    needs=ai_data.get("needs", []),
-                    warnings=ai_data.get("warnings", [])
-                )
-                if not ai_response.transformed_message:
-                    raise ValueError("No transformed message in response")
-                # Save to cache
-                db.save_to_cache(contact_id, message_hash, contact_context, ai_response.transformed_message,
-                                user_id, ai_response)
-                return ai_response
-            except (json.JSONDecodeError, ValueError, KeyError) as e:
-                logger.error(f"Error parsing API response: {str(e)}")
-
-        # Fallback for failed API calls
-        message_lower = message.lower()
-        if message_type == MessageType.TRANSFORM.value:
-            subtext = ""
-            needs = []
-            warnings = []
-            if "angry" in message_lower or "frustrated" in message_lower:
-                subtext = "The user is expressing frustration or anger."
-                needs = ["understanding", "calmness"]
-                warnings = ["Avoid escalating the tone further."]
-            ai_data = {
-                "transformed_message": (
-                    f"I feel {self._normalize_emotional_state('hurt')} about this situation. "
-                    "Can we discuss how to make things better?"
-                ),
-                "healing_score": 5,
-                "sentiment": "neutral",
-                "emotional_state": "calm",
-                "explanation": (
-                    "This response uses 'I' statements to express feelings without blame, "
-                    "encouraging collaboration."
-                ),
-                "subtext": subtext,
-                "needs": needs,
-                "warnings": warnings
-            }
-        else:  # INTERPRET
-            subtext = "The sender may be feeling frustrated or unheard."
-            needs = ["communication", "understanding"]
-            warnings = []
-            if "late" in message_lower or "time" in message_lower:
-                subtext = "The sender is frustrated about punctuality and may feel disrespected."
-                needs = ["reliability", "respect"]
-                if "father" in message_lower or "mother" in message_lower:
-                    warnings.append("Personal criticism may escalate tension.")
-            elif "divorce" in message_lower or "custody" in message_lower:
-                subtext = "The sender may feel stressed about co-parenting responsibilities."
-                needs = ["cooperation", "clarity"]
-                warnings.append("Legal or emotional sensitivity detected.")
-            elif "never" in message_lower or "always" in message_lower:
-                subtext = "The sender feels consistently let down or ignored."
-                needs = ["validation", "consistency"]
-                warnings.append("Absolutist language may indicate deeper unresolved issues.")
-            ai_data = {
-                "transformed_message": (
-                    "I hear how challenging this is for you. Can we work together to find a solution "
-                    "that supports our relationship?"
-                ),
-                "healing_score": 6,
-                "sentiment": "neutral",
-                "emotional_state": "empathetic",
-                "explanation": (
-                    "The response acknowledges the sender's emotions, offers collaboration, and "
-                    "avoids defensiveness."
-                ),
-                "subtext": subtext,
-                "needs": needs,
-                "warnings": warnings
-            }
-
-        ai_response = AIResponse(
-            transformed_message=ai_data["transformed_message"],
-            healing_score=ai_data["healing_score"],
-            sentiment=ai_data["sentiment"],
-            emotional_state=ai_data["emotional_state"],
-            explanation=ai_data["explanation"],
-            subtext=ai_data.get("subtext", ""),
-            needs=ai_data.get("needs", []),
-            warnings=ai_data.get("warnings", [])
+                clean_text = ai_text.strip()
+                
+                if clean_text.startswith("```json"):
+                    clean_text = clean_text.replace("```json", "").replace("```", "").strip()
+                elif clean_text.startswith("```"):
+                    clean_text = clean_text.replace("```", "").strip()
+                
+                start_idx = clean_text.find('{')
+                end_idx = clean_text.rfind('}')
+                
+                if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                    json_text = clean_text[start_idx:end_idx + 1]
+                    ai_data = json.loads(json_text)
+                else:
+                    ai_data = json.loads(clean_text)
+                
+                if "transformed_message" not in ai_data:
+                    raise ValueError("Missing transformed_message in AI response")
+                    
+            except (json.JSONDecodeError, ValueError) as e:
+                # Create context-aware fallback
+                if message_type == "transform":
+                    # Try to create a relevant fallback based on the message content
+                    if "phone" in message.lower() or "call" in message.lower():
+                        fallback_message = "I feel disconnected when I can't reach you. Could we find a good time to talk?"
+                    elif "late" in message.lower():
+                        fallback_message = "I feel frustrated when we start late. Could we work together to find a better approach?"
+                    elif "never" in message.lower():
+                        fallback_message = "I feel unheard and would love to connect better with you."
+                    else:
+                        fallback_message = "I'd like to talk about something that's been on my mind."
+                else:
+                    fallback_message = "Thank you for sharing that with me. I'd like to understand better."
+                    
+                ai_data = {
+                    "transformed_message": fallback_message,
+                    "healing_score": 4,
+                    "sentiment": "neutral",
+                    "emotional_state": "neutral",
+                    "explanation": "AI had trouble parsing - using context-aware fallback"
+                }
+            
+            # Normalize and create response
+            normalized_sentiment = self._normalize_sentiment(ai_data.get("sentiment", "neutral"))
+            normalized_emotional_state = self._normalize_emotional_state(ai_data.get("emotional_state", "neutral"))
+            
+            ai_response = AIResponse(
+                transformed_message=ai_data.get("transformed_message", "Error processing message"),
+                healing_score=min(max(int(ai_data.get("healing_score", 5)), 1), 10),
+                sentiment=normalized_sentiment,
+                emotional_state=normalized_emotional_state,
+                explanation=ai_data.get("explanation", ""),
+                subtext=ai_data.get("subtext", ""),
+                needs=ai_data.get("needs", []),
+                warnings=ai_data.get("warnings", [])
+            )
+            
+            # Cache the response with additional validation
+            db.save_to_cache(
+                contact_id, message_hash, contact_context,
+                ai_response.transformed_message, user_id, ai_response
+            )
+            
+            return ai_response
+            
+        except requests.RequestException as e:
+            return self._create_fallback_response("API connection error")
+            
+        except Exception as e:
+            return self._create_fallback_response("Processing error")
+    
+    def _create_fallback_response(self, error_type: str) -> AIResponse:
+        """Create a fallback response when AI processing fails"""
+        return AIResponse(
+            transformed_message="I'm having trouble right now. Please try again in a moment.",
+            healing_score=1,
+            sentiment="neutral",
+            emotional_state="error",
+            explanation=f"Technical issue: {error_type}"
         )
-        # Save to cache even for fallback
-        db.save_to_cache(contact_id, message_hash, contact_context, ai_response.transformed_message,
-                        user_id, ai_response)
-        return ai_response
