@@ -7,8 +7,8 @@ Enhanced with better logout functionality and session persistence
 import streamlit as st
 import traceback
 from .components import UIComponents
-from .pages import AuthenticationUI, OnboardingFlow, Dashboard
-
+#from .pages import AuthenticationUI, OnboardingFlow, Dashboard
+from .pages import AuthenticationUI, OnboardingFlow, Dashboard, AdminDashboard
 
 class ThirdVoiceApp:
     """Main application controller"""
