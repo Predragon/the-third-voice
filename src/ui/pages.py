@@ -502,3 +502,311 @@ class Dashboard:
                     else:
                         st.error("Please enter a name")
         
+
+
+# Add this to src/ui/pages.py
+
+class AdminDashboard:
+    """Admin dashboard for viewing feedback and analytics"""
+    
+    def __init__(self, db):
+        self.db = db
+    
+    def run(self, user_id: str, auth_manager):
+        """Run admin dashboard - only for admin users"""
+        
+        # Check if user is admin (you can hardcode your email for now)
+        user_email = auth_manager.get_current_user_email()
+        ADMIN_EMAILS = ["thethirdvoice.ai@gmail.com", "hello@thethirdvoice.ai"]  # Add your email
+        
+        if user_email not in ADMIN_EMAILS:
+            st.error("🔒 Access Denied - Admin Only")
+            return
+        
+        UIComponents.render_header_with_logout(auth_manager)
+        
+        st.title("🎛️ Admin Dashboard - The Third Voice")
+        st.markdown("**For Samantha! For every family!** 💪")
+        
+        # Tabs for different admin views
+        tab1, tab2, tab3 = st.tabs(["📊 Feedback Overview", "💬 Detailed Feedback", "📈 Analytics"])
+        
+        with tab1:
+            self._render_feedback_overview()
+        
+        with tab2:
+            self._render_detailed_feedback()
+        
+        with tab3:
+            self._render_analytics()
+    
+    def _render_feedback_overview(self):
+        """Render feedback overview with key metrics"""
+        st.subheader("📊 Feedback Overview")
+        
+        # Get all feedback
+        feedback_data = self._get_all_feedback()
+        
+        if not feedback_data:
+            st.warning("No feedback yet - but families are coming! 🚀")
+            return
+        
+        # Key metrics
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            total_feedback = len(feedback_data)
+            st.metric("Total Feedback", total_feedback)
+        
+        with col2:
+            avg_rating = sum(f['rating'] for f in feedback_data) / len(feedback_data)
+            st.metric("Average Rating", f"{avg_rating:.1f}/5")
+        
+        with col3:
+            recent_count = len([f for f in feedback_data if self._is_recent(f['created_at'])])
+            st.metric("This Week", recent_count)
+        
+        with col4:
+            high_rating_count = len([f for f in feedback_data if f['rating'] >= 4])
+            satisfaction_rate = (high_rating_count / len(feedback_data)) * 100
+            st.metric("Satisfaction", f"{satisfaction_rate:.0f}%")
+        
+        # Rating distribution
+        st.subheader("⭐ Rating Distribution")
+        rating_counts = {}
+        for i in range(1, 6):
+            rating_counts[f"{i} ⭐"] = len([f for f in feedback_data if f['rating'] == i])
+        
+        st.bar_chart(rating_counts)
+        
+        # Recent feedback highlights
+        st.subheader("🔥 Recent Feedback Highlights")
+        recent_feedback = sorted(feedback_data, key=lambda x: x['created_at'], reverse=True)[:5]
+        
+        for feedback in recent_feedback:
+            with st.expander(f"⭐{feedback['rating']} - {feedback['feature_context']} - {feedback['created_at'][:10]}"):
+                if feedback['feedback_text']:
+                    st.write(f"**Feedback:** {feedback['feedback_text']}")
+                else:
+                    st.write("*No text feedback provided*")
+                st.caption(f"User: {feedback['user_id'][:8]}... | Context: {feedback['feature_context']}")
+    
+    def _render_detailed_feedback(self):
+        """Render detailed feedback view with filtering"""
+        st.subheader("💬 Detailed Feedback")
+        
+        feedback_data = self._get_all_feedback()
+        
+        if not feedback_data:
+            st.warning("No feedback yet - but families are coming! 🚀")
+            return
+        
+        # Filters
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            # Rating filter
+            rating_filter = st.selectbox(
+                "Filter by Rating",
+                ["All", "5⭐", "4⭐", "3⭐", "2⭐", "1⭐"]
+            )
+        
+        with col2:
+            # Context filter
+            contexts = list(set(f['feature_context'] for f in feedback_data))
+            context_filter = st.selectbox(
+                "Filter by Context",
+                ["All"] + contexts
+            )
+        
+        with col3:
+            # Date filter
+            date_filter = st.selectbox(
+                "Time Period",
+                ["All Time", "Last 7 Days", "Last 30 Days"]
+            )
+        
+        # Apply filters
+        filtered_data = self._apply_filters(feedback_data, rating_filter, context_filter, date_filter)
+        
+        st.write(f"**Showing {len(filtered_data)} feedback entries**")
+        
+        # Display feedback
+        for feedback in sorted(filtered_data, key=lambda x: x['created_at'], reverse=True):
+            with st.container():
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    # Rating stars
+                    stars = "⭐" * feedback['rating'] + "☆" * (5 - feedback['rating'])
+                    st.markdown(f"**{stars}** ({feedback['rating']}/5)")
+                    
+                    # Feedback text
+                    if feedback['feedback_text']:
+                        st.write(feedback['feedback_text'])
+                    else:
+                        st.write("*Rating only - no text feedback*")
+                
+                with col2:
+                    st.caption(f"**Context:** {feedback['feature_context']}")
+                    st.caption(f"**Date:** {feedback['created_at'][:10]}")
+                    st.caption(f"**User:** {feedback['user_id'][:8]}...")
+                
+                st.divider()
+    
+    def _render_analytics(self):
+        """Render analytics and insights"""
+        st.subheader("📈 Analytics & Insights")
+        
+        feedback_data = self._get_all_feedback()
+        
+        if not feedback_data:
+            st.warning("No feedback yet - but families are coming! 🚀")
+            return
+        
+        # Feature context analysis
+        st.subheader("🎯 Feedback by Feature")
+        context_stats = {}
+        for context in set(f['feature_context'] for f in feedback_data):
+            context_feedback = [f for f in feedback_data if f['feature_context'] == context]
+            context_stats[context] = {
+                'count': len(context_feedback),
+                'avg_rating': sum(f['rating'] for f in context_feedback) / len(context_feedback)
+            }
+        
+        for context, stats in context_stats.items():
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.write(f"**{context.title()}**")
+            with col2:
+                st.metric(f"Avg Rating", f"{stats['avg_rating']:.1f}/5")
+                st.caption(f"{stats['count']} feedback")
+        
+        # Timeline view
+        st.subheader("📅 Feedback Timeline")
+        daily_counts = {}
+        for feedback in feedback_data:
+            date = feedback['created_at'][:10]
+            daily_counts[date] = daily_counts.get(date, 0) + 1
+        
+        if daily_counts:
+            st.line_chart(daily_counts)
+        
+        # Insights
+        st.subheader("💡 Key Insights")
+        
+        # Calculate insights
+        total_feedback = len(feedback_data)
+        high_ratings = len([f for f in feedback_data if f['rating'] >= 4])
+        low_ratings = len([f for f in feedback_data if f['rating'] <= 2])
+        
+        insights = []
+        
+        if high_ratings / total_feedback > 0.8:
+            insights.append("🎉 **Excellent!** Over 80% of users are highly satisfied!")
+        elif high_ratings / total_feedback > 0.6:
+            insights.append("👍 **Good!** Majority of users are satisfied, but room for improvement.")
+        else:
+            insights.append("⚠️ **Attention needed** - User satisfaction could be improved.")
+        
+        if low_ratings > 0:
+            insights.append(f"🔍 **Focus area:** {low_ratings} users gave low ratings - review their feedback closely.")
+        
+        # Most common feedback context
+        context_counts = {}
+        for f in feedback_data:
+            context = f['feature_context']
+            context_counts[context] = context_counts.get(context, 0) + 1
+        
+        if context_counts:
+            top_context = max(context_counts.items(), key=lambda x: x[1])
+            insights.append(f"📊 **Most feedback comes from:** {top_context[0]} ({top_context[1]} responses)")
+        
+        for insight in insights:
+            st.info(insight)
+        
+        # Export options
+        st.subheader("📤 Export Data")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("📊 Export to CSV", use_container_width=True):
+                csv_data = self._export_to_csv(feedback_data)
+                st.download_button(
+                    "Download CSV",
+                    csv_data,
+                    "third_voice_feedback.csv",
+                    "text/csv"
+                )
+        
+        with col2:
+            if st.button("📋 Copy Summary", use_container_width=True):
+                summary = self._generate_summary(feedback_data)
+                st.code(summary)
+    
+    def _get_all_feedback(self):
+        """Get all feedback from database"""
+        try:
+            response = self.db.supabase.table("feedback").select("*").order("created_at", desc=True).execute()
+            return response.data
+        except Exception as e:
+            st.error(f"Error fetching feedback: {str(e)}")
+            return []
+    
+    def _is_recent(self, created_at: str) -> bool:
+        """Check if feedback is from last 7 days"""
+        from datetime import datetime, timedelta
+        try:
+            feedback_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            return feedback_date > datetime.now().replace(tzinfo=feedback_date.tzinfo) - timedelta(days=7)
+        except:
+            return False
+    
+    def _apply_filters(self, data, rating_filter, context_filter, date_filter):
+        """Apply filters to feedback data"""
+        filtered = data
+        
+        # Rating filter
+        if rating_filter != "All":
+            rating_num = int(rating_filter[0])
+            filtered = [f for f in filtered if f['rating'] == rating_num]
+        
+        # Context filter
+        if context_filter != "All":
+            filtered = [f for f in filtered if f['feature_context'] == context_filter]
+        
+        # Date filter
+        if date_filter != "All Time":
+            from datetime import datetime, timedelta
+            days = 7 if "7 Days" in date_filter else 30
+            cutoff = datetime.now() - timedelta(days=days)
+            filtered = [f for f in filtered if datetime.fromisoformat(f['created_at'].replace('Z', '+00:00')) > cutoff.replace(tzinfo=datetime.now().astimezone().tzinfo)]
+        
+        return filtered
+    
+    def _export_to_csv(self, data):
+        """Export feedback to CSV format"""
+        import csv
+        from io import StringIO
+        
+        output = StringIO()
+        writer = csv.DictWriter(output, fieldnames=['created_at', 'rating', 'feedback_text', 'feature_context', 'user_id'])
+        writer.writeheader()
+        writer.writerows(data)
+        return output.getvalue()
+    
+    def _generate_summary(self, data):
+        """Generate feedback summary"""
+        total = len(data)
+        avg_rating = sum(f['rating'] for f in data) / total if total > 0 else 0
+        high_satisfaction = len([f for f in data if f['rating'] >= 4])
+        
+        return f"""
+The Third Voice AI - Feedback Summary
+=====================================
+Total Feedback: {total}
+Average Rating: {avg_rating:.1f}/5
+High Satisfaction: {high_satisfaction} ({(high_satisfaction/total*100):.1f}%)
+
+For Samantha! For every family! 💪
+        """.strip()
