@@ -20,13 +20,36 @@ class ThirdVoiceApp:
         self.auth_ui = AuthenticationUI(self.auth_manager)
         self.onboarding = OnboardingFlow(self.db, self.ai_engine)
         self.dashboard = Dashboard(self.db, self.ai_engine)
+        self.admin_dashboard = AdminDashboard(self.db)
     
     def run(self):
         """Main application entry point"""
         
         # Load custom CSS for mobile optimization
         UIComponents.load_custom_css()
-        
+        # Check for admin mode (add ?admin=true to URL)
+try:
+    query_params = st.query_params
+    if query_params.get('admin') == 'true':
+        if not self.auth_ui.run():
+            return
+        user_id = self.auth_manager.get_current_user_id()
+        if user_id:
+            self.admin_dashboard.run(user_id, self.auth_manager)
+        return
+except:
+    # Fallback for older Streamlit versions
+    try:
+        query_params = st.experimental_get_query_params()
+        if 'admin' in query_params and query_params['admin'][0] == 'true':
+            if not self.auth_ui.run():
+                return
+            user_id = self.auth_manager.get_current_user_id()
+            if user_id:
+                self.admin_dashboard.run(user_id, self.auth_manager)
+            return
+    except:
+        pass
         # Authentication check
         if not self.auth_ui.run():
             return
