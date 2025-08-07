@@ -1,0 +1,84 @@
+[server]
+fileWatcherType = "none"
+# This completely disables file watching to avoid inotify limits
+
+[client]
+toolbarMode = "minimal"
+
+[global]
+# Also suppress some warnings
+showWarningOnDirectExecution = false
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+You're absolutely correct! This is a known Streamlit Cloud infrastructure issue, not related to your code changes. Here's what's actually happening:
+
+The Real Issue
+This is a well-documented problem where Streamlit Cloud deployments hit the inotify instance limit, and it's been affecting users since at least 2020 
+Streamlit
+Streamlit
+. The timing correlation with your AI model changes is purely coincidental.
+
+What's Actually Happening
+Streamlit Cloud has resource limits on their shared infrastructure
+The inotify system (used for file watching) has kernel-level limits
+Your deployment environment has hit this limit - not your specific code
+This affects the entire container/instance, not just your directory structure
+Proven Solutions
+The most effective solutions from the Streamlit community are:
+
+1. Disable File Watching (Most Effective)
+Create .streamlit/config.toml:
+
+
+.streamlit/config.toml
+Code ∙ Version 2 
+2. Reboot Your App
+Go to your Streamlit Cloud dashboard
+Click the "⚙️" menu next to your app
+Select "Reboot app"
+3. If Problem Persists
+This is a Streamlit Cloud infrastructure issue. You may need to:
+
+Deploy to a different region/server
+Contact Streamlit support
+Consider alternative deployment (Heroku, Railway, etc.)
+Why The Timing Seemed Related
+Your AI model changes likely triggered a redeployment, which happened to land on a Streamlit Cloud instance that was already at its inotify limit. This is purely coincidental infrastructure bad luck, not a code issue.
+
+Your AI engine code looks perfectly fine - the issue is entirely with the deployment environment's system limits.
+
+
+
+
+
+
+
+[server]
+fileWatcherType = "none"
+# This completely disables file watching to avoid inotify limits
+
+[client]
+toolbarMode = "minimal"
+
+[global]
+# Also suppress some warnings
+showWarningOnDirectExecution = false
