@@ -7,59 +7,7 @@ Enhanced with better logout functionality and session persistence
 import streamlit as st
 import traceback
 from .components import UIComponents
-from .pages import OnboardingFlow, Dashboard, AdminDashboard
-
-
-class AuthenticationUI:
-    """Handles authentication UI and logic"""
-    
-    def __init__(self, auth_manager):
-        self.auth_manager = auth_manager
-    
-    def run(self):
-        """Render authentication UI and handle login"""
-        # Check if already authenticated
-        if self.auth_manager.is_authenticated():
-            return True
-        
-        # Handle Google OAuth callback
-        user = self.auth_manager.handle_google_callback()
-        if user:
-            return True
-        
-        # Display authentication UI
-        st.title("The Third Voice AI - Login")
-        st.write("Sign in to access your personalized dashboard")
-        
-        # Google Sign-In
-        self.auth_manager.sign_in_with_google()
-        
-        # Email/Password Sign-In (existing functionality)
-        with st.form("login_form"):
-            email = st.text_input("Email")
-            password = st.text_input("Password", type="password")
-            submit = st.form_submit_button("Sign In")
-            if submit:
-                success, message = self.auth_manager.sign_in(email, password)
-                if success:
-                    st.success(message)
-                    st.rerun()
-                else:
-                    st.error(message)
-        
-        # Sign-Up
-        with st.form("signup_form"):
-            signup_email = st.text_input("Email for Sign Up")
-            signup_password = st.text_input("Password for Sign Up", type="password")
-            signup_submit = st.form_submit_button("Sign Up")
-            if signup_submit:
-                success, message = self.auth_manager.sign_up(signup_email, signup_password)
-                if success:
-                    st.success(message)
-                else:
-                    st.error(message)
-        
-        return False
+from .pages import AuthenticationUI, OnboardingFlow, Dashboard, AdminDashboard
 
 
 class ThirdVoiceApp:
