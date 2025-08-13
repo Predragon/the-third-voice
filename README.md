@@ -42,21 +42,37 @@ It’s love, encoded.
 ## 📁 Project Structure
 
 ```
-the-third-voice/
-├── third_voice_ai/
-│   ├── ai_processor.py      # Handles AI rewriting, tone analysis, and emotional interpretation
-│   ├── auth_manager.py      # Manages user auth with Supabase
-│   ├── config.py            # System config and model registry
-│   ├── data_manager.py      # Supabase integration and message history handling
-│   ├── prompts.py           # Empathy-rich prompt templates
-│   ├── state_manager.py     # Session state orchestration
-│   ├── utils.py             # Healing score, emotional metadata, helper functions
-│   └── ui/
-│       ├── auth_ui.py       # Login/signup interface (Streamlit + Resend verification)
-│       ├── main_ui.py       # Core interface logic and view switching
-│       ├── components.py    # Reusable UI pieces
-├── app.py                   # Streamlit entry point
+~/the-third-voice $ tree
+.
+├── CONTRIBUTING.md
+├── LICENSE
+├── README.md
+├── SETUP.md
+├── app.py
+├── archive
 ├── requirements.txt
+├── src
+│   ├── __init__.py
+│   ├── auth
+│   │   ├── __init__.py
+│   │   └── auth_manager.py
+│   ├── config
+│   │   ├── __init__.py
+│   │   └── settings.py
+│   ├── core
+│   │   ├── __init__.py
+│   │   └── ai_engine.py
+│   ├── data
+│   │   ├── __init__.py
+│   │   ├── database.py
+│   │   └── models.py
+│   └── ui
+│       ├── __init__.py
+│       ├── app_controller.py
+│       ├── components.py
+│       └── pages.py
+└── streamlit
+    └── secrets.toml.template
 ```
 
 ---
