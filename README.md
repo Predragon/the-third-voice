@@ -41,7 +41,6 @@ It’s love, encoded.
 
 ## 📁 Project Structure
 
-```
 ~/the-third-voice $ tree
 .
 ├── CONTRIBUTING.md
@@ -50,6 +49,8 @@ It’s love, encoded.
 ├── SETUP.md
 ├── app.py
 ├── archive
+│   ├── app.py.mono.txt
+│   ├── minimal.app.py
 ├── requirements.txt
 ├── src
 │   ├── __init__.py
@@ -73,7 +74,6 @@ It’s love, encoded.
 │       └── pages.py
 └── streamlit
     └── secrets.toml.template
-```
 
 ---
 
@@ -103,23 +103,28 @@ No login wall. No paywall. Just a tool to help people talk better when it’s ha
 
 ## 🚧 Getting Started
 
+### ▶ Run in Google Colab (No Install Needed)
+
+You can try **The Third Voice** instantly in Google Colab using your own API keys:  
+
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Predragon/the-third-voice/blob/main/notebooks/the_third_voice_shared.ipynb)
+
+---
+
 ### 1. Clone the repo
 
 ```bash
 git clone https://github.com/Predragon/the-third-voice.git
 cd the-third-voice
-```
 
-### 2. Install dependencies
+2. Install dependencies
 
-```bash
 pip install -r requirements.txt
-```
 
-### 3. Add your secrets  
-Create `.streamlit/secrets.toml`:
+3. Add your secrets
 
-```toml
+Create .streamlit/secrets.toml:
+
 [openrouter]
 api_key = "your_openrouter_key"
 
@@ -131,43 +136,54 @@ key = "your_supabase_anon_key"
 model1 = "google/gemma-2-9b-it:free"
 model2 = "meta-llama/llama-3.2-3b-instruct:free"
 ...
-```
 
-### 4. Run the app
+4. Run the app
 
-```bash
 streamlit run app.py
-```
+
 
 ---
 
-## 🤝 How to Contribute
+🤝 How to Contribute
 
 We welcome collaborators across:
 
-- Emotional UX/UI design  
-- Psychology and behavioral science  
-- Ethical AI and NLP modeling  
-- Docs, onboarding, and empathy-focused copywriting  
-- Personal stories that inspired this project
+Emotional UX/UI design
+
+Psychology and behavioral science
+
+Ethical AI and NLP modeling
+
+Docs, onboarding, and empathy-focused copywriting
+
+Personal stories that inspired this project
+
 
 Start with a pull request or open an issue. Let us know what draws you in.
 
+
 ---
 
-## ❤️ Built With Intention
+❤️ Built With Intention
 
-This project began during 15 months of detention.  
-No laptop. No funding. Just one father, one phone, and one mission:  
+This project began during 15 months of detention.
+No laptop. No funding. Just one father, one phone, and one mission:
 
-> Help families heal through better communication.  
+> Help families heal through better communication.
+
+
 
 Whether you’re a developer, therapist, parent, or someone trying to say the right thing when it’s hardest — this project is for you.
 
+
 ---
 
-## 📬 Contact
+📬 Contact
 
-- Email: `thethirdvoice.ai@gmail.com`  
-- GitHub: [Predragon](https://github.com/Predragon)  
-- Website: [www.thethirdvoice.ai](http://www.thethirdvoice.ai)
+Email: thethirdvoice.ai@gmail.com
+
+GitHub: Predragon
+
+Website: www.thethirdvoice.ai
+
+
