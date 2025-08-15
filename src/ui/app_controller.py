@@ -2,6 +2,7 @@
 App Controller Module for The Third Voice AI
 Main application controller that orchestrates all components
 Enhanced with demo account support, AI chat, and session persistence
+FIXED: Demo users now get AI responses too
 """
 
 import streamlit as st
@@ -70,6 +71,11 @@ class ThirdVoiceApp:
         user = getattr(st.session_state, "user", None)
         user_id = user.id if user else self.auth_manager.get_current_user_id()
         user_email = user.email if user else self.auth_manager.get_current_user_email()
+
+        # For demo users, set a demo user_id
+        if DemoManager.is_demo():
+            user_id = "demo_user"
+            user_email = "demo@example.com"
 
         if not user_id:
             st.error("Authentication error. Please refresh the page.")
@@ -179,26 +185,31 @@ class ThirdVoiceApp:
                     context = selected_contact["context"] if isinstance(selected_contact, dict) else "friend"
                     contact_id = selected_contact["id"] if isinstance(selected_contact, dict) else "unknown"
                     
-                    # Use the correct method from AIEngine
+                    # FIXED: Process AI for ALL users including demo users
                     with st.spinner("Processing your message..."):
                         ai_response = self.ai_engine.process_message(
                             message=user_input,
                             contact_context=context,
                             message_type=mode_choice.lower(),
                             contact_id=contact_id,
-                            user_id=user_id,
+                            user_id=user_id,  # This now works for demo users too
                             db=self.db
                         )
 
                     # Display AI Response with rich formatting
                     self._display_ai_response(ai_response, mode_choice)
 
-                    # Store messages
+                    # Store messages differently for demo vs regular users
                     if DemoManager.is_demo():
+                        # Store in session state for demo
                         DemoManager.add_message(user_input, ai_response.transformed_message, selected_contact, mode_choice)
                     else:
-                        from ..data.database import save_message
-                        save_message(user_email, user_input, ai_response.transformed_message, selected_contact, mode_choice)
+                        # Store in database for regular users
+                        try:
+                            from ..data.database import save_message
+                            save_message(user_email, user_input, ai_response.transformed_message, selected_contact, mode_choice)
+                        except Exception as e:
+                            st.warning(f"Message processed but not saved to database: {e}")
 
                 except Exception as e:
                     st.error(f"Error processing message: {str(e)}")
