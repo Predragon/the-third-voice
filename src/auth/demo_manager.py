@@ -5,7 +5,6 @@ Handles demo account login, session-based chat, and usage tracking
 
 import streamlit as st
 import datetime
-from ..data.database import db  # Your DatabaseManager instance
 
 DEMO_EMAIL = "demo@thethirdvoice.ai"
 DEMO_PASSWORD = "demo1234"
@@ -15,7 +14,7 @@ class DemoManager:
     """Manage demo account login and session messages"""
 
     @staticmethod
-    def sign_in():
+    def sign_in(db_instance):
         """Sign in as demo user and initialize session"""
         class DemoUser:
             def __init__(self, email):
@@ -31,7 +30,7 @@ class DemoManager:
             if hasattr(st, "request") and getattr(st.request, "remote_addr", None):
                 ip_address = st.request.remote_addr
             login_time = datetime.datetime.utcnow().isoformat()
-            db.supabase.table("demo_usage").insert({
+            db_instance.supabase.table("demo_usage").insert({
                 "user_email": DEMO_EMAIL,
                 "login_time": login_time,
                 "ip_address": ip_address
