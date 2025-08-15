@@ -9,8 +9,6 @@ import traceback
 from .components import UIComponents
 from .pages import AuthenticationUI, OnboardingFlow, Dashboard, AdminDashboard
 from ..auth.demo_manager import DemoManager
-from ..core.ai_engine import generate_response
-from ..data.database import save_message
 
 
 class ThirdVoiceApp:
@@ -92,7 +90,8 @@ class ThirdVoiceApp:
 
         if st.button("Send"):
             if user_input.strip():
-                response = generate_response(user_email, user_input)
+                # Use AIEngine instance instead of separate function
+                response = self.ai_engine.generate_response(user_email, user_input)
 
                 # Display response
                 st.text_area("AI Response:", value=response, height=200)
@@ -102,6 +101,7 @@ class ThirdVoiceApp:
                     DemoManager.add_message(user_input, response)
                 else:
                     # Save for real users
+                    from ..data.database import save_message
                     save_message(user_email, user_input)
 
         # --- Display past demo messages if demo ---
