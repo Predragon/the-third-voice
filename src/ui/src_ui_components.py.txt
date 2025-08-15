@@ -1,0 +1,138 @@
+    @staticmethod
+    def render_header_with_logout(auth_manager):
+        """Render header with logout functionality"""
+        col1, col2 = st.columns([4, 1])
+        
+        with col1:
+            st.markdown("""
+            <div style='padding: 0.5rem 0;'>
+                <h2 style='color: #2E86AB; margin: 0;'>🎙️ Third Voice</h2>
+                <p style='color: #666; font-size: 0.9rem; margin: 0;'>
+                    Healing conversations with AI
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            # User info and logout
+            user_email = auth_manager.get_current_user_email()
+            if user_email:
+                # Show user email (truncated for mobile)
+                display_email = user_email.split('@')[0] if '@' in user_email else user_email
+                if len(display_email) > 10:
+                    display_email = display_email[:10] + "..."
+                
+                st.markdown(f"""
+                <div style='text-align: right; padding: 0.2rem 0; font-size: 0.8rem; color: #666;'>
+                    👤 {display_email}
+                </div>
+                """, unsafe_allow_html=True)
+            
+            if st.button("🚪 Logout", key="logout_header", help="Sign out"):
+                auth_manager.sign_out()
+                st.rerun()
+
+    @staticmethod
+    def render_demo_header(auth_manager):
+        """Render special header for demo users"""
+        if not auth_manager.is_demo_user():
+            UIComponents.render_header_with_logout(auth_manager)
+            return
+        
+        # Demo user special header
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            st.markdown("""
+            <div style='padding: 0.5rem 0;'>
+                <h2 style='color: #2E86AB; margin: 0;'>🎭 Third Voice Demo</h2>
+                <p style='color: #666; font-size: 0.9rem; margin: 0;'>
+                    Try the full experience - no signup required!
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            # Demo status and logout
+            time_remaining = auth_manager.get_demo_time_remaining()
+            if time_remaining and time_remaining != "Expired":
+                st.markdown(f"""
+                <div style='text-align: right; padding: 0.2rem 0; font-size: 0.8rem; color: #666;'>
+                    🎭 Demo: {time_remaining}
+                </div>
+                """, unsafe_allow_html=True)
+            
+            if st.button("🚪 Exit Demo", key="demo_logout", help="Exit demo mode"):
+                auth_manager.sign_out()
+                st.rerun()
+
+    @staticmethod
+    def render_demo_upgrade_banner():
+        """Render upgrade banner for demo users"""
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    color: white; padding: 1rem; border-radius: 10px; margin: 1rem 0; text-align: center;
+                    border: 2px solid rgba(255,255,255,0.2);'>
+            <h4 style='margin: 0; color: white;'>🌟 Love what you see?</h4>
+            <p style='margin: 0.5rem 0; opacity: 0.9;'>
+                Create a free account to save your conversations and contacts forever!
+            </p>
+            <div style='margin-top: 1rem;'>
+                <small style='opacity: 0.8;'>
+                    ✅ Always free  ✅ Keep your data  ✅ No time limits
+                </small>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    @staticmethod
+    def render_demo_feature_callout(feature_name: str):
+        """Render callout explaining demo vs full features"""
+        demo_limitations = {
+            "conversations": "In demo mode, your conversations reset when you refresh. Sign up to keep them forever!",
+            "contacts": "Demo contacts are temporary. Create an account to build your permanent contact list!",
+            "history": "Your conversation history is saved only for this session. Sign up to build long-term insights!",
+            "feedback": "Your demo feedback helps us improve! Sign up to track your own progress over time."
+        }
+        
+        limitation = demo_limitations.get(feature_name)
+        if limitation:
+            st.info(f"🎭 **Demo Note:** {limitation}")
+
+    @staticmethod
+    def render_demo_cta_buttons():
+        """Render call-to-action buttons for demo users"""
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("🆕 Create Free Account", use_container_width=True, type="primary"):
+                # Clear demo session and redirect to signup
+                if 'user' in st.session_state:
+                    del st.session_state['user']
+                if 'is_demo_user' in st.session_state:
+                    del st.session_state['is_demo_user']
+                st.rerun()
+        
+        with col2:
+            if st.button("🔄 Continue Demo", use_container_width=True, type="secondary"):
+                st.success("Keep exploring! 🎭")
+
+    @staticmethod
+    def render_demo_data_notice():
+        """Show notice about demo data persistence"""
+        with st.expander("ℹ️ About Demo Data"):
+            st.markdown("""
+            **Demo Mode Features:**
+            - ✅ Full app functionality
+            - ✅ All AI features work normally  
+            - ✅ Create contacts and conversations
+            - ⏰ 2-hour session (renewable)
+            - 🔄 Data resets when you restart
+            
+            **Why create an account?**
+            - 💾 Keep your data permanently
+            - 📈 Track your communication growth
+            - 🎯 Get personalized insights over time
+            - 🔒 Privacy-protected storage
+            - ⚡ No session limits
+            """)
