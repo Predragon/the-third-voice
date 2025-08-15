@@ -54,9 +54,9 @@ class ThirdVoiceApp:
             except:
                 pass
 
-        # Demo login button
+        # --- Demo login button ---
         if st.button("Use Demo Account"):
-            DemoManager.sign_in()
+            DemoManager.sign_in(self.db)  # Pass DatabaseManager instance here
 
         # Demo warning
         if DemoManager.is_demo():
@@ -99,10 +99,7 @@ class ThirdVoiceApp:
 
                 if DemoManager.is_demo():
                     # Store messages in session only
-                    st.session_state['demo_messages'].append({
-                        "input": user_input,
-                        "response": response
-                    })
+                    DemoManager.add_message(user_input, response)
                 else:
                     # Save for real users
                     save_message(user_email, user_input)
