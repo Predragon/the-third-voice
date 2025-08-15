@@ -586,15 +586,15 @@ class Dashboard:
         """Show demo progress and conversation history"""
         
         # Demo stats
-        stats = auth_manager.get_demo_stats()
+       # stats = auth_manager.get_demo_stats()
         
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Messages Tried", stats.get('messages', 0))
-        with col2:
-            st.metric("Contacts", stats.get('contacts', 0))
-        with col3:
-            st.metric("Session", "Demo Mode 🎭")
+       # col1, col2, col3 = st.columns(3)
+      #  with col1:
+      #      st.metric("Messages Tried", stats.get('messages', 0))
+       # with col2:
+       #     st.metric("Contacts", stats.get('contacts', 0))
+     #   with col3:
+         #   st.metric("Session", "Demo Mode 🎭")
         
         # Recent conversations (limit to 3 in code)
         messages = self.db.get_conversation_history(contact.id, user_id)
