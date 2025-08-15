@@ -40,6 +40,7 @@ class ThirdVoiceApp:
                     self.admin_dashboard.run(user_id, self.auth_manager)
                 return
         except:
+            # Fallback for older Streamlit versions
             try:
                 query_params = st.experimental_get_query_params()
                 if 'admin' in query_params and query_params['admin'][0] == 'true':
@@ -55,7 +56,7 @@ class ThirdVoiceApp:
         # --- Demo Login ---
         if st.button("Use Demo Account"):
             DemoManager.sign_in(self.db)
-            st.experimental_rerun()
+            st.rerun()  # Updated from st.experimental_rerun()
 
         # Demo warning
         if DemoManager.is_demo():
@@ -95,7 +96,7 @@ class ThirdVoiceApp:
             if not contacts:
                 # Run onboarding for first-time users
                 if self.onboarding.run(user_id, self.auth_manager):
-                    st.rerun()
+                    st.rerun()  # Updated from st.experimental_rerun()
                 return
             st.session_state.onboarding_completed = True
 
