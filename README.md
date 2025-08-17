@@ -1,3 +1,19 @@
+# 🧠💬 The Third Voice AI - Streamlit Demo
+**Status**: This is the Streamlit demo, live at [https://the-third-voice.streamlit.app](https://the-third-voice.streamlit.app). For the production MVP (Next.js + FastAPI), see [Predragon/the-third-voice-mvp](https://github.com/Predragon/the-third-voice-mvp).
+
+**Founder**: Predrag Mirkovic
+**Mission**: Heal families through emotionally intelligent communication.
+**Live Demo**: [https://the-third-voice.streamlit.app](https://the-third-voice.streamlit.app)
+**Website**: [www.thethirdvoice.ai](http://www.thethirdvoice.ai)
+**Email**: thethirdvoice.ai@gmail.com, hello@thethirdvoice.ai
+**License**: Apache 2.0
+
+This repository hosts the Streamlit demo, built from detention on an Android phone. It’s actively maintained for bug fixes and feedback. Join our mission in the MVP repo to scale The Third Voice AI!
+
+
+
+
+
 # 🧠💬 The Third Voice — AI for Emotionally Intelligent Communication  
 **Founder:** Predrag Mirkovic  
 **Live Demo:** [https://the-third-voice.streamlit.app](https://the-third-voice.streamlit.app)  
